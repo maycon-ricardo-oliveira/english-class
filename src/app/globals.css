@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -14,7 +18,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
+    --background: #FFF;
     --foreground: #ededed;
   }
 }
@@ -23,4 +27,104 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ... (outros estilos) ... */
+
+#calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px; /* Ou use bordas para separação */
+  background-color: #d1d5db; /* Cor de fundo para as "linhas" da grade */
+  border: 1px solid #d1d5db; /* Borda externa da grade */
+}
+
+.calendar-day-header {
+  font-weight: 600;
+  text-align: center;
+  padding: 0.5rem 0.25rem;
+  background-color: #e5e7eb;
+  font-size: 0.75rem; /* 12px */
+}
+
+.calendar-day {
+  background-color: #fff;
+  /* min-height: 100px; */ /* Removido para dar prioridade ao aspect-ratio */
+  padding: 0.25rem; /* Padding menor para mais espaço interno */
+  font-size: 0.75rem; /* 12px */
+  position: relative;
+  display: flex; /* Ativa Flexbox */
+  flex-direction: column; /* Empilha itens verticalmente */
+  aspect-ratio: 1 / 1; /* Torna a célula quadrada */
+  overflow: hidden; /* Evita que conteúdo estoure e quebre o layout quadrado */
+}
+
+.calendar-day-number {
+  font-weight: 600;
+  font-size: 0.65rem; /* Tamanho menor para o número do dia */
+  text-align: right; /* Alinha o número à direita */
+  /* margin-bottom: 0.25rem; */ /* Removido, o flex controlará o espaço */
+}
+
+.calendar-day.other-month {
+  background-color: #f9fafb;
+  color: #9ca3af;
+}
+.calendar-day.other-month .calendar-day-number {
+  color: #9ca3af;
+}
+
+
+.calendar-day.today .calendar-day-number {
+  background-color: #3b82f6;
+  color: white;
+  border-radius: 50%;
+  width: 1.25rem; /* Ajuste de tamanho para o círculo do dia atual */
+  height: 1.25rem;
+  display: inline-flex; /* Para centralizar o número dentro do círculo */
+  align-items: center;
+  justify-content: center;
+  margin-left: auto; /* Empurra para a direita */
+}
+
+.calendar-aulas-container { /* Novo container para as aulas, para permitir scroll se necessário */
+  flex-grow: 1; /* Ocupa o espaço restante */
+  overflow-y: auto; /* Adiciona scroll se muitas aulas */
+  margin-top: 0.125rem; /* Pequena margem acima das aulas */
+  display: flex;
+  flex-direction: column;
+  gap: 2px; /* Espaço entre as pílulas de aula */
+}
+
+.calendar-aula {
+  font-size: 0.6rem; /* Fonte ainda menor para as aulas */
+  padding: 1px 4px; /* Padding vertical e horizontal */
+  margin-bottom: 0; /* Removido, gap no container pai */
+  border-radius: 0.25rem; /* 4px */
+  border-left-width: 3px;
+  line-height: 1.2; /* Ajuste para melhor leitura */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ... (outros estilos como .status-pendente, etc. permanecem os mesmos) ... */
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="time"] { /* Adicione outros types se necessário */
+  @apply p-2 text-gray-600 border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm;
+  /* Você pode adicionar outras classes base do Tailwind aqui */
+}
+
+/* Para placeholders, se quiser centralizar também */
+input::placeholder {
+  @apply text-gray-400; /* Exemplo, ajuste a cor do placeholder */
+}
+input::-moz-placeholder { /* Firefox */
+  @apply text-gray-400;
+  opacity: 1;
 }
