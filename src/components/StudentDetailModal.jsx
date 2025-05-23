@@ -1,25 +1,14 @@
 'use client'; // Necessário para hooks
 
 import React, { useState, useEffect, useMemo } from 'react';
-import useAppStore from '../store/useAppStore'; // Ajuste o caminho
 import { formatCurrency, formatDate, formatDuration } from '../utils/formatters';
 import { X, CalendarPlus, CalendarCheck, Trash2, CheckCircle, DollarSign, AlertCircle, Clock } from 'lucide-react'; // Ícones adicionados
 
 export default function StudentDetailModal({ isOpen, onClose, studentId, onOpenAddAula, onOpenAddAulaLote, showToast }) {
   // Ações e seletores do store
-  // getLoggedInTeacher não é mais necessário aqui diretamente para buscar o aluno
-  const updateAulaStatus = useAppStore((state) => state.updateAulaStatus);
-  const deleteAulaAction = useAppStore((state) => state.deleteAula);
-  const deleteStudentAction = useAppStore((state) => state.deleteStudent);
-  const loggedInTeacherId = useAppStore((state) => state.loggedInTeacherId); // Para o seletor do aluno
 
-  // --- OBTÉM O ALUNO DIRETAMENTE DO STORE E REATIVAMENTE ---
-  const student = useAppStore((state) => {
-    if (!isOpen || !studentId || !state.loggedInTeacherId) return null;
-    const teacher = state.teachers.find(t => t.id === state.loggedInTeacherId);
-    if (!teacher || !teacher.students) return null;
-    return teacher.students.find(s => s.id === studentId) || null;
-  });
+
+
   // --- FIM DA ALTERAÇÃO ---
 
   // Estado local para o filtro de aulas

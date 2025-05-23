@@ -1,37 +1,48 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'; // useEffect pode não ser mais necessário aqui
 import { useRouter } from 'next/navigation';
-import useAppStore from '../../store/useAppStore';
-import { LogIn } from 'lucide-react';
+import Link from 'next/link';
+import { handleFirebaseLogin } from '../../utils/authService'; // Importa diretamente a função de login
+import { LogIn, ArrowRight } from 'lucide-react';
+import Toast from '../../components/Toast';
 
 export default function LoginPage() {
   const router = useRouter();
-  const loginTeacher = useAppStore((state) => state.loginTeacher);
-  const loggedInTeacherId = useAppStore((state) => state.loggedInTeacherId);
-  const isLoadingAuth = useAppStore((state) => state.isLoadingAuth);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (!isLoadingAuth && loggedInTeacherId) {
-      router.replace('/home');
-    }
-  }, [loggedInTeacherId, isLoadingAuth, router]);
+  const [toast, setToast] = useState({ message: '', type: '', isOpen: false });
 
+  const showToast = (message, type = 'info', duration = 4000) => {
+    setToast({ message, type, isOpen: true, duration });
+  };
+
+  const closeToast = () => {
+    setToast({ message: '', type: '', isOpen: false });
+  };
+  
   const handleLogin = async (e) => {
     e.preventDefault();
-    setError('');
     setIsSubmitting(true);
     try {
-      await loginTeacher(email, password);
-      router.push('/home');
+      // Chama diretamente a função de login do authService
+      const user = await handleFirebaseLogin(email, password);
+      console.log("Login bem-sucedido, usuário:", user);
+      showToast('Login bem-sucedido! Redirecionando...', 'success');
+      // Após o login bem-sucedido, o onAuthStateChanged no RootLayout (se configurado)
+      // deve detectar a mudança e o RootLayout ou um componente de ordem superior
+      // deve lidar com o redirecionamento para /home.
+      // Por enquanto, podemos adicionar um redirecionamento direto aqui,
+      // mas o ideal é que o estado global de autenticação dispare isso.
+      setTimeout(() => {
+        router.replace('/home'); // Redireciona para a home após o login
+      }, 1500); // Pequeno delay para o toast ser visível
     } catch (err) {
       console.error("Erro no login (capturado em LoginPage):", err);
-      setError(err.message || 'Erro ao tentar fazer login.');
+      showToast(err.message || 'Erro ao tentar fazer login.', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -41,24 +52,37 @@ export default function LoginPage() {
     router.push('/register');
   };
 
-  if (isLoadingAuth) {
-    return <p className="text-center mt-10 text-gray-600">Verificando autenticação...</p>;
-  }
-  if (loggedInTeacherId) {
-      return <p className="text-center mt-10 text-gray-600">Redirecionando...</p>;
-  }
+  // A lógica de "Verificando autenticação..." ou "Redirecionando..." foi removida
+  // pois esta página agora não tem conhecimento do estado global de autenticação.
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-100">
-      <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-xl border border-gray-200">
-        <h2 className="text-3xl font-bold text-center text-gray-800 mb-8">
-          Login do Professor
-        </h2>
-        <form onSubmit={handleLogin} className="space-y-6">
+    <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100 px-4 sm:px-6 lg:px-8">
+      {toast.isOpen && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={closeToast}
+          duration={toast.duration}
+        />
+      )}
+      <div className="w-full max-w-md bg-white p-8 sm:p-10 rounded-xl shadow-lg">
+        <div className="text-center mb-8">
+            <Link href="/" className="inline-block mb-6">
+                <span className="text-3xl font-bold text-indigo-600">ClassFlow</span>
+            </Link>
+            <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900">
+            Acesse sua Conta
+            </h2>
+            <p className="mt-2 text-sm text-gray-700">
+            Bem-vindo de volta! Insira seus dados para continuar.
+            </p>
+        </div>
+        
+        <form onSubmit={handleLogin} className="space-y-5">
           <div>
             <label
               htmlFor="loginEmail"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-gray-800 mb-1"
             >
               Email
             </label>
@@ -68,15 +92,16 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={isSubmitting}
               placeholder="seu@email.com"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 text-gray-700 placeholder-gray-400"
+              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-50"
             />
           </div>
 
           <div>
             <label
               htmlFor="loginPassword"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-gray-800 mb-1"
             >
               Senha
             </label>
@@ -86,19 +111,16 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              disabled={isSubmitting}
               placeholder="Sua senha"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 text-gray-700 placeholder-gray-400"
+              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-50"
             />
           </div>
-
-          {error && (
-            <p className="text-red-500 text-sm text-center">{error}</p>
-          )}
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full inline-flex justify-center items-center py-3 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            className="w-full inline-flex justify-center items-center py-3 px-4 border border-transparent shadow-sm text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 transition-opacity"
           >
             {isSubmitting ? (
               <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -112,15 +134,11 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-600 mt-6">
+        <p className="text-center text-sm text-gray-700 mt-8">
           Não tem uma conta?{' '}
-          <button
-            type="button"
-            onClick={handleGoToRegister}
-            className="font-medium text-indigo-600 hover:text-indigo-500"
-          >
-            Registre-se
-          </button>
+          <Link href="/register" className="font-medium text-indigo-600 hover:text-indigo-500 hover:underline">
+            Registre-se <ArrowRight className="inline h-4 w-4"/>
+          </Link>
         </p>
       </div>
     </div>

@@ -1,13 +1,10 @@
 'use client'; // Necessário para hooks e interações
 
 import React, { useState, useEffect, useMemo } from 'react';
-import useAppStore from '../store/useAppStore'; // Ajuste o caminho se necessário
 import { formatCurrency, formatDate, formatDateToInput, formatDuration, getInitials } from '../utils/formatters';
 import { CalendarDays, ChevronLeft, ChevronRight, CheckCircle, DollarSign, AlertCircle, Clock, Trash2 } from 'lucide-react';
 
 export default function CalendarSection({ showToast }) {
-  // --- CORREÇÃO: Acessar loggedInTeacherData diretamente ---
-  const teacherData = useAppStore((state) => state.loggedInTeacherData);
   // --- FIM DA CORREÇÃO ---
 
   const allTeacherAulas = useMemo(() => {
@@ -208,8 +205,6 @@ function WeekView({ date, aulas, formatDuration, formatCurrency, formatDateToInp
 
 // --- Componente de Visualização Diária ---
 function DayView({ date, aulas, formatDuration, formatCurrency, formatDateToInput, showToast }) {
-  const updateAulaStatus = useAppStore(state => state.updateAulaStatus);
-  const deleteAulaAction = useAppStore(state => state.deleteAula);
 
   const dateString = formatDateToInput(date);
   const aulasDoDia = aulas.filter(a => a.data === dateString).sort((a, b) => (a.horario || '').localeCompare(b.horario || ''));

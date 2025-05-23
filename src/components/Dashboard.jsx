@@ -2,22 +2,14 @@
 
 import React, { useMemo } from 'react';
 // --- Usando caminho relativo ---
-import useAppStore from '../store/useAppStore';
 // --- Fim da correção ---
 import { formatCurrency } from '../utils/formatters'; // Importa a função de formatação
 import { LayoutDashboard } from 'lucide-react'; // Ícone
 
 export default function Dashboard() {
-  // --- SELEÇÃO DE ESTADO ATUALIZADA PARA REATIVIDADE ---
-  const teachers = useAppStore((state) => state.teachers);
-  const loggedInTeacherId = useAppStore((state) => state.loggedInTeacherId);
 
-  const teacher = useMemo(() => {
-    if (!loggedInTeacherId || !Array.isArray(teachers)) return null;
-    return teachers.find(t => t.id === loggedInTeacherId) || null;
-  }, [teachers, loggedInTeacherId]);
 
-  const students = useMemo(() => teacher?.students || [], [teacher]);
+
   // --- FIM DA ATUALIZAÇÃO DA SELEÇÃO DE ESTADO ---
 
 

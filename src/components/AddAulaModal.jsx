@@ -1,14 +1,11 @@
 'use client'; // Necessário para hooks
 
 import React, { useState, useEffect } from 'react';
-import useAppStore from '../store/useAppStore'; // Ajuste o caminho se necessário
 import { formatCurrency, formatDateToInput } from '../utils/formatters';
 import { CalendarPlus, X } from 'lucide-react';
 
 export default function AddAulaModal({ isOpen, onClose, studentId }) {
-  // Ações e seletores do store
-  const addAulaAction = useAppStore((state) => state.addAula);
-  const getLoggedInTeacher = useAppStore((state) => state.getLoggedInTeacher);
+
 
   // Estados locais para os campos do formulário
   const [dataAula, setDataAula] = useState('');

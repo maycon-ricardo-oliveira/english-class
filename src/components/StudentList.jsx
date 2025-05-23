@@ -1,12 +1,10 @@
 'use client'; // Necessário para hooks
 
 import React, { useState, useMemo } from 'react';
-import useAppStore from '../store/useAppStore'; // Ajuste o caminho se necessário
 import { Users, Search, ArrowRight } from 'lucide-react'; // Ícones
 
 // O componente StudentList agora espera uma prop onOpenDetail
 export default function StudentList({ onOpenDetail }) {
-  const teacher = useAppStore((state) => state.getLoggedInTeacher());
   const students = teacher?.students || [];
 
   const [searchTerm, setSearchTerm] = useState('');
