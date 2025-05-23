@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext'; // Importa o hook useAuth
-import { addAulasLoteToDb } from '../utils/api'; // Importa a função de API
+import { addLessonsLoteToDb } from '../utils/api'; // Importa a função da API com nome corrigido
 import { formatCurrency, formatDateToInput } from '../utils/formatters';
 import { CalendarCheck, X } from 'lucide-react';
 
@@ -11,12 +11,12 @@ export default function AddAulaLoteModal({ isOpen, onClose, studentId, showToast
 
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
-  const [horaAula, setHoraAula] = useState('');
-  const [minutoAula, setMinutoAula] = useState('');
-  const [duracaoLesson, setDuracaoLesson] = useState(60); // Alterado para duracaoLesson
-  const [valorLessonAluno, setValorLessonAluno] = useState(0); // Alterado para valorLessonAluno
+  const [lessonHour, setLessonHour] = useState('');   // Renomeado de horaAula
+  const [lessonMinute, setLessonMinute] = useState(''); // Renomeado de minutoAula
+  const [lessonDuration, setLessonDuration] = useState(60); // Renomeado de duracaoAula
+  const [studentLessonValue, setStudentLessonValue] = useState(0); // Renomeado de valorAulaAluno
   const [diasSemana, setDiasSemana] = useState([]);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(''); // Erro local para o formulário
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const weekdaysOptions = [
@@ -30,17 +30,17 @@ export default function AddAulaLoteModal({ isOpen, onClose, studentId, showToast
     if (isOpen && studentId && teacherData && teacherData.students) {
       const student = teacherData.students.find(s => s.id === studentId);
       if (student) {
-        setValorLessonAluno(student.valorAula); // Assume que o valor da aula está no student
+        setStudentLessonValue(student.lessonValue || 0); // Usa lessonValue do aluno
       } else {
-        setValorLessonAluno(0);
+        setStudentLessonValue(0);
         console.warn(`AddAulaLoteModal: Aluno com ID ${studentId} não encontrado.`);
         if(showToast) showToast(`Aluno com ID ${studentId} não encontrado.`, 'error');
       }
       setDataInicio(formatDateToInput(new Date()));
       setDataFim('');
-      setHoraAula('');
-      setMinutoAula('');
-      setDuracaoLesson(60);
+      setLessonHour('');
+      setLessonMinute('');
+      setLessonDuration(60);
       setDiasSemana([]);
       setError('');
       setIsSubmitting(false);
@@ -85,22 +85,22 @@ export default function AddAulaLoteModal({ isOpen, onClose, studentId, showToast
       return;
     }
 
-    const horaNum = parseInt(horaAula, 10);
-    const minutoNum = parseInt(minutoAula, 10);
-    if (isNaN(horaNum) || horaNum < 0 || horaNum > 23) {
+    const hourNum = parseInt(lessonHour, 10);
+    const minuteNum = parseInt(lessonMinute, 10);
+    if (isNaN(hourNum) || hourNum < 0 || hourNum > 23) {
       setError('Hora inválida. Use um valor entre 00 e 23.');
       setIsSubmitting(false);
       return;
     }
-    if (isNaN(minutoNum) || minutoNum < 0 || minutoNum > 59) {
+    if (isNaN(minuteNum) || minuteNum < 0 || minuteNum > 59) {
       setError('Minuto inválido. Use um valor entre 00 e 59.');
       setIsSubmitting(false);
       return;
     }
-    const horarioFormatado = `${String(horaNum).padStart(2, '0')}:${String(minutoNum).padStart(2, '0')}`;
+    const formattedTime = `${String(hourNum).padStart(2, '0')}:${String(minuteNum).padStart(2, '0')}`;
 
-    const duracaoNum = parseInt(String(duracaoLesson), 10);
-    if (isNaN(duracaoNum) || duracaoNum <= 0) {
+    const durationNum = parseInt(String(lessonDuration), 10);
+    if (isNaN(durationNum) || durationNum <= 0) {
       setError('A duração da aula deve ser um número positivo.');
       setIsSubmitting(false);
       return;
@@ -111,35 +111,35 @@ export default function AddAulaLoteModal({ isOpen, onClose, studentId, showToast
       return;
     }
 
-    const novasLessons = []; // Alterado para novasLessons
+    const newLessonsPayload = []; // Array para os payloads das lições
     let currentDateIter = new Date(startDate);
     while (currentDateIter <= endDate) {
       if (diasSemana.includes(currentDateIter.getDay())) {
-        novasLessons.push({ // Alterado para novasLessons
-          data: formatDateToInput(currentDateIter),
-          horario: horarioFormatado,
-          duracao: duracaoNum,
-          valor: valorLessonAluno, // Usa o valor padrão do aluno
+        newLessonsPayload.push({
+          date: formatDateToInput(currentDateIter),
+          time: formattedTime,
+          duration: durationNum,
+          value: studentLessonValue,
           status: 'Pendente',
         });
       }
       currentDateIter.setDate(currentDateIter.getDate() + 1);
     }
 
-    if (novasLessons.length === 0) { // Alterado para novasLessons
+    if (newLessonsPayload.length === 0) {
       setError('Nenhuma aula foi gerada para o período e dias selecionados.');
       setIsSubmitting(false);
       return;
     }
 
     try {
-      await addAulasLoteToDb(currentUser.uid, studentId, novasLessons); // Passa novasLessons
-      if (showToast) showToast(`${novasLessons.length} aula(s) adicionada(s) com sucesso!`, 'success');
+      await addLessonsLoteToDb(currentUser.uid, studentId, newLessonsPayload);
+      if (showToast) showToast(`${newLessonsPayload.length} aula(s) adicionada(s) com sucesso!`, 'success');
       onClose();
     } catch (err) {
       console.error("Erro ao adicionar aulas em lote:", err);
       setError(err.message || 'Erro desconhecido ao adicionar aulas em lote.');
-      // if (showToast) showToast(err.message || 'Erro desconhecido ao adicionar aulas em lote.', 'error'); // Opcional, erro local já é exibido
+      // if (showToast) showToast(err.message || 'Erro desconhecido...', 'error'); // Opcional
     } finally {
       setIsSubmitting(false);
     }
@@ -155,7 +155,7 @@ export default function AddAulaLoteModal({ isOpen, onClose, studentId, showToast
         <div className="p-6">
           <div className="flex justify-between items-center border-b border-gray-200 pb-3 mb-6">
             <h3 className="text-xl leading-6 font-semibold text-gray-900">
-              Adicionar Aulas (Lessons) em Lote
+              Adicionar Aulas em Lote
             </h3>
             <button
               type="button"
@@ -170,29 +170,29 @@ export default function AddAulaLoteModal({ isOpen, onClose, studentId, showToast
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="modalDataInicioLote" className="block text-sm font-medium text-gray-700 text-left">Data de Início:</label>
-                <input type="date" id="modalDataInicioLote" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} required disabled={isSubmitting} className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-100"/>
+                <label htmlFor="modalLoteDataInicio" className="block text-sm font-medium text-gray-700 text-left">Data de Início:</label>
+                <input type="date" id="modalLoteDataInicio" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} required disabled={isSubmitting} className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-100"/>
               </div>
               <div>
-                <label htmlFor="modalDataFimLote" className="block text-sm font-medium text-gray-700 text-left">Data de Fim:</label>
-                <input type="date" id="modalDataFimLote" value={dataFim} onChange={(e) => setDataFim(e.target.value)} required disabled={isSubmitting} className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-100"/>
+                <label htmlFor="modalLoteDataFim" className="block text-sm font-medium text-gray-700 text-left">Data de Fim:</label>
+                <input type="date" id="modalLoteDataFim" value={dataFim} onChange={(e) => setDataFim(e.target.value)} required disabled={isSubmitting} className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-100"/>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="modalHoraAulaLote" className="block text-sm font-medium text-gray-700 text-left">Hora Padrão (00-23):</label>
-                <input type="number" id="modalHoraAulaLote" value={horaAula} onChange={(e) => setHoraAula(e.target.value.replace(/\D/g, '').slice(0, 2))} min="0" max="23" placeholder="HH" required disabled={isSubmitting} className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-100"/>
+                <label htmlFor="modalLoteLessonHour" className="block text-sm font-medium text-gray-700 text-left">Hora Padrão (00-23):</label>
+                <input type="number" id="modalLoteLessonHour" value={lessonHour} onChange={(e) => setLessonHour(e.target.value.replace(/\D/g, '').slice(0, 2))} min="0" max="23" placeholder="HH" required disabled={isSubmitting} className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-100"/>
               </div>
               <div>
-                <label htmlFor="modalMinutoAulaLote" className="block text-sm font-medium text-gray-700 text-left">Minuto Padrão (00-59):</label>
-                <input type="number" id="modalMinutoAulaLote" value={minutoAula} onChange={(e) => setMinutoAula(e.target.value.replace(/\D/g, '').slice(0, 2))} min="0" max="59" placeholder="MM" required disabled={isSubmitting} className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-100"/>
+                <label htmlFor="modalLoteLessonMinute" className="block text-sm font-medium text-gray-700 text-left">Minuto Padrão (00-59):</label>
+                <input type="number" id="modalLoteLessonMinute" value={lessonMinute} onChange={(e) => setLessonMinute(e.target.value.replace(/\D/g, '').slice(0, 2))} min="0" max="59" placeholder="MM" required disabled={isSubmitting} className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-100"/>
               </div>
             </div>
 
             <div>
-              <label htmlFor="modalDuracaoLessonLote" className="block text-sm font-medium text-gray-700 text-left">Duração Padrão (minutos):</label> {/* Alterado para modalDuracaoLessonLote */}
-              <input type="number" id="modalDuracaoLessonLote" value={duracaoLesson} onChange={(e) => setDuracaoLesson(e.target.value)} min="15" step="15" required disabled={isSubmitting} className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-100"/>
+              <label htmlFor="modalLoteLessonDuration" className="block text-sm font-medium text-gray-700 text-left">Duração Padrão (minutos):</label>
+              <input type="number" id="modalLoteLessonDuration" value={lessonDuration} onChange={(e) => setLessonDuration(e.target.value)} min="15" step="15" required disabled={isSubmitting} className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-100"/>
             </div>
 
             <div>
@@ -214,7 +214,7 @@ export default function AddAulaLoteModal({ isOpen, onClose, studentId, showToast
             </div>
 
             <p className="text-sm text-gray-600 text-left pt-2">
-              Valor de cada aula (lesson): <span className="font-semibold text-gray-800">{formatCurrency(valorLessonAluno)}</span>
+              Valor de cada aula: <span className="font-semibold text-gray-800">{formatCurrency(studentLessonValue)}</span>
             </p>
 
             {error && <p className="text-red-600 text-sm text-center bg-red-50 p-2 rounded-md">{error}</p>}
@@ -230,7 +230,7 @@ export default function AddAulaLoteModal({ isOpen, onClose, studentId, showToast
                 ) : (
                   <CalendarCheck className="mr-2 h-5 w-5" />
                 )}
-                {isSubmitting ? 'Gerando...' : 'Gerar Aulas (Lessons)'}
+                {isSubmitting ? 'Gerando...' : 'Gerar Aulas'}
               </button>
               <button
                 type="button"

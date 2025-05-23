@@ -1,36 +1,38 @@
 // src/context/AuthContext.js
-'use client'; // Necessário para Context API com hooks no App Router
+'use client'; 
 
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
-import { auth, database } from '../utils/firebase'; // Ajuste o caminho se necessário
+import { auth, database } from '../utils/firebase'; 
 import { onAuthStateChanged } from 'firebase/auth';
-import { ref, get as getFirebaseData, onValue } from 'firebase/database';
-import { handleFirebaseLogout } from '../utils/authService'; // Para a função de logout
+import { ref, onValue, set as firebaseSet } from 'firebase/database'; // Renomeado 'set' para 'firebaseSet' para evitar conflito
+import { handleFirebaseLogout } from '../utils/authService'; 
 
 const AuthContext = createContext(undefined);
 
 export function AuthProvider({ children }) {
-  const [currentUser, setCurrentUser] = useState(null); // Guarda o objeto user do Firebase Auth
-  const [teacherData, setTeacherData] = useState(null); // Guarda os dados do Realtime DB
-  const [isLoadingAuth, setIsLoadingAuth] = useState(true); // Para o estado inicial de autenticação
-  const [isLoadingData, setIsLoadingData] = useState(false); // Para carregar dados do DB
-  const [teacherDataUnsubscribe, setTeacherDataUnsubscribe] = useState(null); // Para o listener do DB
+  const [currentUser, setCurrentUser] = useState(null); 
+  const [teacherData, setTeacherData] = useState(null); 
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true); 
+  const [isLoadingData, setIsLoadingData] = useState(false); 
+  const [teacherDataUnsubscribe, setTeacherDataUnsubscribe] = useState(null);
 
   useEffect(() => {
     console.log("AuthContext: Configurando onAuthStateChanged listener...");
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       console.log("AuthContext: onAuthStateChanged disparado. User:", user ? user.uid : "Nenhum usuário");
       if (user) {
-        setCurrentUser(user); // Define o usuário do Firebase Auth
-        setIsLoadingData(true); // Começa a carregar dados do DB
+        setCurrentUser(user); 
+        // Não definimos isLoadingAuth para false aqui imediatamente,
+        // esperamos que teacherData seja carregado ou a tentativa de carregar termine.
+        // No entanto, para o guardião de rota, isLoadingAuth deve ser false quando o user é determinado.
+        setIsLoadingAuth(false); // Auth state determinado
+        setIsLoadingData(true);  // Começa a carregar dados do DB
 
-        // Limpa listener de dados anterior, se houver
         if (teacherDataUnsubscribe) {
           console.log("AuthContext: Limpando listener de dados do professor anterior (onAuthStateChanged).");
           teacherDataUnsubscribe();
         }
 
-        // Configura novo listener para os dados do professor no Realtime Database
         const teacherDataRef = ref(database, `teachersData/${user.uid}`);
         console.log(`AuthContext: Configurando listener onValue para teachersData/${user.uid}`);
         const newDbUnsubscribe = onValue(teacherDataRef, (snapshot) => {
@@ -39,34 +41,51 @@ export function AuthProvider({ children }) {
             console.log("AuthContext: Dados do professor recebidos do DB (onValue):", data);
             setTeacherData({
               ...data,
-              id: user.uid, // Garante que o ID é o UID do Auth
-              email: user.email, // Garante que o email do Auth é usado
+              id: user.uid, 
+              email: user.email, 
               name: data.name || user.displayName || user.email.split('@')[0],
               students: data.students ? Object.values(data.students).map(s => ({
                 ...s,
-                lessons: s.lessons ? Object.values(s.lessons) : []
+                lessons: s.lessons ? Object.values(s.lessons) : [] 
               })) : []
             });
           } else {
-            console.warn(`AuthContext: Dados do professor UID ${user.uid} não encontrados no DB (onValue). Pode ser um novo registro.`);
-            // Se o nó não existe, mas o usuário está autenticado (ex: logo após registro),
-            // a função registerTeacherInFirebase em authService.js já deve ter criado o nó.
-            // Se ainda não existir, pode ser um problema ou um delay.
-            // Por segurança, definimos um estado mínimo.
-            setTeacherData({
+            console.warn(`AuthContext: Dados do professor UID ${user.uid} não encontrados no DB (onValue). Criando perfil básico...`);
+            // Cria um perfil básico se não existir (ex: logo após o registro)
+            const basicProfile = {
                 id: user.uid,
                 email: user.email,
                 name: user.displayName || user.email.split('@')[0],
-                students: []
-            });
+                students: {} // Começa como objeto vazio para Firebase
+            };
+            firebaseSet(ref(database, `teachersData/${user.uid}`), basicProfile)
+                .then(() => {
+                    console.log("AuthContext: Perfil básico criado no DB para", user.uid);
+                    // O listener onValue será acionado novamente com os novos dados
+                    // e isLoadingData será definido como false lá.
+                    // Se não, definimos aqui, mas o ideal é o listener tratar.
+                    // setTeacherData({ ...basicProfile, students: [] }); // Converte para array
+                })
+                .catch(error => {
+                    console.error("AuthContext: Erro ao criar perfil básico no DB:", error);
+                    setTeacherData(null); // Falha ao criar, dados nulos
+                })
+                .finally(() => {
+                     // Mesmo que a criação do perfil básico falhe ou o listener demore,
+                     // é importante setar isLoadingData para false após a tentativa.
+                     // No entanto, o listener onValue deve idealmente tratar isso.
+                     // Se snapshot.exists() é false, onValue já chamou o callback e definiu isLoadingData.
+                });
+            // Se o nó não existe, o primeiro onValue o tratará e definirá teacherData
+            // e isLoadingData = false.
           }
-          setIsLoadingData(false);
+          setIsLoadingData(false); // Marca que o carregamento/tentativa dos dados do DB terminou
         }, (error) => {
           console.error("AuthContext: Erro no listener onValue para dados do professor:", error);
           setTeacherData(null);
           setIsLoadingData(false);
         });
-        setTeacherDataUnsubscribe(() => newDbUnsubscribe); // Guarda a função de unsubscribe do DB
+        setTeacherDataUnsubscribe(() => newDbUnsubscribe);
 
       } else {
         // Usuário deslogado
@@ -78,20 +97,19 @@ export function AuthProvider({ children }) {
         setCurrentUser(null);
         setTeacherData(null);
         setIsLoadingData(false);
+        setIsLoadingAuth(false); // Marca que a verificação inicial de autenticação terminou
       }
-      setIsLoadingAuth(false); // Marca que a verificação inicial de autenticação terminou
     });
 
-    // Limpa o listener de autenticação quando o AuthProvider desmontar
     return () => {
       console.log("AuthContext: Limpando onAuthStateChanged listener.");
       unsubscribeAuth();
-      if (teacherDataUnsubscribe) { // Limpa também o listener do DB se ainda existir
+      if (teacherDataUnsubscribe) { 
         console.log("AuthContext: Limpando listener de dados do professor (desmonte do AuthProvider).");
         teacherDataUnsubscribe();
       }
     };
-  }, []); // Array de dependências vazio para rodar apenas uma vez
+  }, []); // teacherDataUnsubscribe foi removido das dependências para evitar loops
 
   const logout = async () => {
     try {
@@ -99,21 +117,17 @@ export function AuthProvider({ children }) {
       // O onAuthStateChanged cuidará de limpar currentUser, teacherData, etc.
     } catch (error) {
       console.error("Erro no logout (AuthContext):", error);
-      // Tratar o erro de logout, talvez com um toast
-      throw error; // Relança para o componente que chamou
+      throw error;
     }
   };
 
-  // O valor fornecido pelo contexto
   const value = useMemo(() => ({
-    currentUser,      // Objeto user do Firebase Auth (ou null)
-    teacherData,      // Dados do professor do Realtime DB (ou null)
-    isLoadingAuth,    // Booleano: true enquanto onAuthStateChanged não rodou pela primeira vez
-    isLoadingData,    // Booleano: true enquanto teacherData está a ser carregado do DB
-    logout,           // Função para deslogar
-    // Adicione aqui outras funções ou estados que queira expor, ex: login, register
-    // mas por enquanto, as páginas de login/registro chamam diretamente as funções do authService.js
-  }), [currentUser, teacherData, isLoadingAuth, isLoadingData]);
+    currentUser,
+    teacherData,
+    isLoadingAuth,
+    isLoadingData,
+    logout,
+  }), [currentUser, teacherData, isLoadingAuth, isLoadingData]); // Removido logout das dependências pois é estável
 
   return (
     <AuthContext.Provider value={value}>
@@ -122,10 +136,6 @@ export function AuthProvider({ children }) {
   );
 }
 
-/**
- * Hook customizado para usar o AuthContext.
- * @returns O valor do AuthContext.
- */
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

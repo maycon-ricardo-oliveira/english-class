@@ -1,58 +1,61 @@
-'use client'; // Necessário para hooks
+'use client';
 
 import React, { useState, useEffect } from 'react';
-// A importação de useAppStore foi removida
-// import useAppStore from '../store/useAppStore'; 
-import { UserPlus, PlusCircle, X } from 'lucide-react'; // Ícones
+// A importação de useAppStore foi removida anteriormente
+import { UserPlus, PlusCircle, X } from 'lucide-react';
 
-// Recebe isOpen, showToast, onCloseModal, teacherIdOverride e a nova prop addStudentAction
 export default function StudentForm({ 
   isOpen, 
   showToast, 
   onCloseModal, 
-  teacherIdOverride = null, 
-  addStudentAction // Nova prop para a função de adicionar aluno
+  // teacherIdOverride = null, // Esta prop não é mais usada aqui se addStudentAction lida com o teacherId
+  addStudentAction 
 }) {
-  // Estados locais para os campos do formulário
-  const [nomeAluno, setNomeAluno] = useState('');
-  const [valorAula, setValorAula] = useState('');
-  const [diaPagamento, setDiaPagamento] = useState('');
+  const [name, setName] = useState('');
+  const [studentEmail, setStudentEmail] = useState(''); // Novo campo
+  const [lessonLink, setLessonLink] = useState('');   // Novo campo
+  const [lessonValue, setLessonValue] = useState(''); // Renomeado de valorAula
+  const [paymentDay, setPaymentDay] = useState('');   // Renomeado de diaPagamento
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Efeito para limpar o formulário quando o modal é aberto (prop isOpen muda para true)
   useEffect(() => {
     if (isOpen) {
-        setNomeAluno('');
-        setValorAula('');
-        setDiaPagamento('');
-        // Se houvesse um estado de erro local, também seria resetado aqui.
+        setName('');
+        setStudentEmail('');
+        setLessonLink('');
+        setLessonValue('');
+        setPaymentDay('');
     }
   }, [isOpen]);
 
-  // Lida com o submit do formulário
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    if (!nomeAluno.trim()) {
+    if (!name.trim()) {
       if (showToast) showToast('O nome do aluno é obrigatório.', 'error');
       setIsSubmitting(false);
       return;
     }
-    const valorAulaNum = parseFloat(valorAula);
-    if (isNaN(valorAulaNum) || valorAulaNum <= 0) {
+    // Validação opcional para email
+    if (studentEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(studentEmail.trim())) {
+        if (showToast) showToast('Formato de email do aluno inválido.', 'error');
+        setIsSubmitting(false);
+        return;
+    }
+    const lessonValueNum = parseFloat(lessonValue);
+    if (isNaN(lessonValueNum) || lessonValueNum <= 0) {
       if (showToast) showToast('O valor da aula deve ser um número positivo.', 'error');
       setIsSubmitting(false);
       return;
     }
-    const diaPagamentoNum = parseInt(diaPagamento, 10);
-    if (isNaN(diaPagamentoNum) || diaPagamentoNum < 1 || diaPagamentoNum > 31) {
+    const paymentDayNum = parseInt(paymentDay, 10);
+    if (isNaN(paymentDayNum) || paymentDayNum < 1 || paymentDayNum > 31) {
       if (showToast) showToast('O dia de pagamento deve ser um número entre 1 e 31.', 'error');
       setIsSubmitting(false);
       return;
     }
 
-    // Verifica se a função addStudentAction foi passada como prop
     if (typeof addStudentAction !== 'function') {
         console.error("StudentForm: A função addStudentAction não foi fornecida como prop.");
         if (showToast) showToast('Erro de configuração: Ação de adicionar aluno não disponível.', 'error');
@@ -61,22 +64,26 @@ export default function StudentForm({
     }
 
     try {
-      const studentData = {
-        nome: nomeAluno.trim(),
-        valorAula: valorAulaNum,
-        diaPagamento: diaPagamentoNum,
+      const studentPayload = {
+        name: name.trim(),
+        studentEmail: studentEmail.trim() || null, // Envia null se vazio
+        lessonLink: lessonLink.trim() || null,     // Envia null se vazio
+        lessonValue: lessonValueNum,
+        paymentDay: paymentDayNum,
       };
-      // Chama a função addStudentAction passada via props
-      await addStudentAction(studentData, teacherIdOverride); 
-      if (showToast) showToast(`Aluno "${studentData.nome}" adicionado com sucesso!`, 'success');
+      // A prop teacherIdOverride foi removida daqui,
+      // a função addStudentAction (passada pela página pai) deve lidar com o teacherId correto.
+      await addStudentAction(studentPayload); 
+      if (showToast) showToast(`Aluno "${studentPayload.name}" adicionado com sucesso!`, 'success');
       
       if (onCloseModal) {
         onCloseModal();
       } else { 
-        // Se não estiver num modal, apenas limpa o formulário (caso de uso na DbTestPage sem modal)
-        setNomeAluno('');
-        setValorAula('');
-        setDiaPagamento('');
+        setName('');
+        setStudentEmail('');
+        setLessonLink('');
+        setLessonValue('');
+        setPaymentDay('');
       }
     } catch (err) {
       console.error("Erro ao adicionar aluno (StudentForm):", err);
@@ -91,7 +98,7 @@ export default function StudentForm({
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 flex items-center">
           <UserPlus className="mr-2 text-indigo-600 h-6 w-6" />
-          {teacherIdOverride ? 'Cadastrar Aluno (Teste DB)' : 'Cadastrar Novo Aluno'}
+          Cadastrar Novo Aluno
         </h2>
         {onCloseModal && (
             <button
@@ -106,17 +113,12 @@ export default function StudentForm({
       </div>
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label
-            htmlFor="formModalNomeAluno"
-            className="block text-sm font-medium text-gray-800 mb-1"
-          >
-            Nome do Aluno:
-          </label>
+          <label htmlFor="formStudentName" className="block text-sm font-medium text-gray-800 mb-1">Nome do Aluno:</label>
           <input
             type="text"
-            id="formModalNomeAluno"
-            value={nomeAluno}
-            onChange={(e) => setNomeAluno(e.target.value)}
+            id="formStudentName" // ID alterado para consistência
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             required
             disabled={isSubmitting}
             placeholder="Nome completo do aluno"
@@ -124,35 +126,51 @@ export default function StudentForm({
           />
         </div>
 
+        <div>
+          <label htmlFor="formStudentEmail" className="block text-sm font-medium text-gray-800 mb-1">Email do Aluno (Opcional):</label>
+          <input
+            type="email"
+            id="formStudentEmail"
+            value={studentEmail}
+            onChange={(e) => setStudentEmail(e.target.value)}
+            disabled={isSubmitting}
+            placeholder="email@aluno.com"
+            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-100"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="formLessonLink" className="block text-sm font-medium text-gray-800 mb-1">Link Padrão da Aula (Opcional):</label>
+          <input
+            type="url"
+            id="formLessonLink"
+            value={lessonLink}
+            onChange={(e) => setLessonLink(e.target.value)}
+            disabled={isSubmitting}
+            placeholder="https://exemplo.com/aula"
+            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-100"
+          />
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label
-              htmlFor="formModalValorAula"
-              className="block text-sm font-medium text-gray-800 mb-1"
-            >
-              Valor Padrão/Aula (R$):
-            </label>
+            <label htmlFor="formLessonValue" className="block text-sm font-medium text-gray-800 mb-1">Valor/Aula (R$):</label> {/* Renomeado para formLessonValue */}
             <input
               type="number"
-              id="formModalValorAula"
-              value={valorAula}
-              onChange={(e) => setValorAula(e.target.value)}
+              id="formLessonValue"
+              value={lessonValue}
+              onChange={(e) => setLessonValue(e.target.value)}
               step="0.01" min="0.01" required disabled={isSubmitting} placeholder="Ex: 50.00"
               className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-100"
             />
           </div>
           <div>
-            <label
-              htmlFor="formModalDiaPagamento"
-              className="block text-sm font-medium text-gray-800 mb-1"
-            >
-              Dia de Pagamento (1-31):
-            </label>
+            <label htmlFor="formPaymentDay" className="block text-sm font-medium text-gray-800 mb-1">Dia de Pagamento (1-31):</label> {/* Renomeado para formPaymentDay */}
             <input
               type="number"
-              id="formModalDiaPagamento"
-              value={diaPagamento}
-              onChange={(e) => setDiaPagamento(e.target.value)}
+              id="formPaymentDay"
+              value={paymentDay}
+              onChange={(e) => setPaymentDay(e.target.value)}
               min="1" max="31" required disabled={isSubmitting} placeholder="Ex: 10"
               className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-100"
             />

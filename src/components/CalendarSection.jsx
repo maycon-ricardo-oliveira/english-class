@@ -1,14 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useAuth } from '../context/AuthContext'; 
+import { useAuth } from '../context/AuthContext';
 import { formatCurrency, formatDate, formatDateToInput, formatDuration, getInitials } from '../utils/formatters';
 import { CalendarDays, ChevronLeft, ChevronRight, CheckCircle, DollarSign, AlertCircle, Clock, Trash2 } from 'lucide-react';
-import { updateAulaStatusInDb, deleteAulaFromDb } from '../utils/api';
+import { updateLessonStatusInDb, deleteLessonFromDb } from '../utils/api';
 
-
-export default function CalendarSection({ showToast }) { 
-  const { teacherData, isLoadingAuth, isLoadingData, currentUser } = useAuth(); 
+export default function CalendarSection({ showToast, onCalendarLessonClick }) {
+  const { teacherData, isLoadingAuth, isLoadingData, currentUser } = useAuth();
 
   const allTeacherLessons = useMemo(() => {
     let lessons = [];
@@ -16,12 +15,16 @@ export default function CalendarSection({ showToast }) {
       teacherData.students.forEach(student => {
         const studentLessons = Array.isArray(student.lessons) ? student.lessons : [];
         studentLessons.forEach(lesson => {
-          lessons.push({ ...lesson, studentName: student.nome, studentId: student.id });
+          lessons.push({ 
+            ...lesson, 
+            studentName: student.name || student.nome || "Aluno Desconhecido", 
+            studentId: student.id 
+          });
         });
       });
     }
     return lessons;
-  }, [teacherData]); 
+  }, [teacherData]);
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState('month');
@@ -61,10 +64,14 @@ export default function CalendarSection({ showToast }) {
     return '';
   };
 
-  const handleDayClick = (dayDate) => {
+  const handleDayClickForMonthView = (dayDate) => {
     setCurrentDate(new Date(dayDate));
     setViewMode('day');
   };
+
+  const baseViewButtonStyle = "inline-flex items-center px-4 py-2 border text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors";
+  const activeViewButtonStyle = "bg-indigo-600 text-white border-transparent focus:ring-indigo-500";
+  const inactiveViewButtonStyle = "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 focus:ring-gray-400";
 
   const renderCalendarView = () => {
     const formatterProps = { formatCurrency, formatDate, formatDateToInput, formatDuration, getInitials };
@@ -77,12 +84,12 @@ export default function CalendarSection({ showToast }) {
 
     switch (viewMode) {
       case 'week':
-        return <WeekView date={currentDate} lessons={allTeacherLessons} {...formatterProps} showToast={showToast} teacherId={currentUser.uid} />;
+        return <WeekView date={currentDate} lessons={allTeacherLessons} {...formatterProps} showToast={showToast} teacherId={currentUser.uid} onLessonClick={onCalendarLessonClick} />;
       case 'day':
-        return <DayView date={currentDate} lessons={allTeacherLessons} {...formatterProps} showToast={showToast} teacherId={currentUser.uid} />;
+        return <DayView date={currentDate} lessons={allTeacherLessons} {...formatterProps} showToast={showToast} teacherId={currentUser.uid} onLessonClick={onCalendarLessonClick} />;
       case 'month':
       default:
-        return <MonthView date={currentDate} lessons={allTeacherLessons} onDayClick={handleDayClick} {...formatterProps} />;
+        return <MonthView date={currentDate} lessons={allTeacherLessons} onDayClick={handleDayClickForMonthView} {...formatterProps} onLessonClick={onCalendarLessonClick} />;
     }
   };
 
@@ -92,11 +99,10 @@ export default function CalendarSection({ showToast }) {
         <h2 className="text-xl font-semibold text-gray-800 flex items-center">
           <CalendarDays className="mr-2 text-purple-600 h-5 w-5" /> Calendário de Aulas
         </h2>
-        <div className="flex space-x-1  p-0.5">
-          
-          <button onClick={() => setViewMode('month')} className={`inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2  focus:ring-gray-400 view-button ${viewMode === 'month' ? 'active' : ''}`}>Mês</button>
-          <button onClick={() => setViewMode('week')} className={`inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 view-button ${viewMode === 'week' ? 'active' : ''}`}>Semana</button>
-          <button onClick={() => setViewMode('day')} className={`inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 view-button ${viewMode === 'day' ? 'active' : ''}`}>Dia</button>
+        <div className="flex space-x-2">
+          <button onClick={() => setViewMode('month')} className={`${baseViewButtonStyle} ${viewMode === 'month' ? activeViewButtonStyle : inactiveViewButtonStyle}`}>Mês</button>
+          <button onClick={() => setViewMode('week')} className={`${baseViewButtonStyle} ${viewMode === 'week' ? activeViewButtonStyle : inactiveViewButtonStyle}`}>Semana</button>
+          <button onClick={() => setViewMode('day')} className={`${baseViewButtonStyle} ${viewMode === 'day' ? activeViewButtonStyle : inactiveViewButtonStyle}`}>Dia</button>
         </div>
       </div>
       <div className="flex justify-between items-center mb-4">
@@ -112,7 +118,7 @@ export default function CalendarSection({ showToast }) {
 }
 
 // --- Componente de Visualização Mensal ---
-function MonthView({ date, lessons, onDayClick, formatDuration, getInitials, formatDateToInput }) {
+function MonthView({ date, lessons, onDayClick, formatDuration, getInitials, formatDateToInput, onLessonClick }) {
   const year = date.getFullYear();
   const month = date.getMonth();
   const firstDayOfMonth = new Date(year, month, 1);
@@ -120,7 +126,7 @@ function MonthView({ date, lessons, onDayClick, formatDuration, getInitials, for
   const daysInMonth = lastDayOfMonth.getDate();
   const firstDayWeekday = firstDayOfMonth.getDay();
   const today = new Date(); 
-  today.setHours(0,0,0,0); // Normaliza 'hoje' para comparação de data apenas
+  today.setHours(0,0,0,0);
 
   const dayCells = [];
 
@@ -130,37 +136,43 @@ function MonthView({ date, lessons, onDayClick, formatDuration, getInitials, for
 
   for (let day = 1; day <= daysInMonth; day++) {
     const currentDate = new Date(year, month, day);
-    currentDate.setHours(0,0,0,0); // Normaliza para comparação com 'today'
+    currentDate.setHours(0,0,0,0); 
     const dateString = formatDateToInput(currentDate);
-    const lessonsDoDia = lessons.filter(l => l.data === dateString).sort((a, b) => (a.horario || '').localeCompare(b.horario || ''));
+    const lessonsDoDia = lessons.filter(l => l.date === dateString).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
     
     const isToday = currentDate.getTime() === today.getTime();
 
     dayCells.push(
       <div 
         key={day} 
-        className={`calendar-day ${isToday ? 'bg-indigo-50 border-indigo-300' : ''} cursor-pointer hover:bg-gray-100 transition-colors duration-150`} 
-        onClick={() => onDayClick(currentDate)}
+        className={`calendar-day ${isToday ? 'bg-indigo-50' : ''} hover:bg-gray-50 transition-colors duration-150`} 
       >
         <div 
-          className={`calendar-day-number text-xs text-right pr-1 font-medium ${isToday ? 'text-indigo-600' : 'text-gray-700'}`} // Cor mais escura e destaque para hoje
+          className={`calendar-day-number text-xs font-medium mb-1 flex justify-end ${isToday ? 'today-number' : 'text-gray-700'}`}
+          onClick={() => onDayClick(currentDate)} 
         >
-          {day}
+          <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full ${isToday ? 'bg-indigo-600 text-white' : ''}`}>
+            {day}
+          </span>
         </div>
-        <div className="calendar-aulas-container mt-1 space-y-1"> {/* Adicionado espaçamento entre aulas */}
+        <div className="calendar-aulas-container flex-grow overflow-y-auto space-y-1">
           {lessonsDoDia.map(lesson => {
             const statusAtual = lesson.status || 'Pendente';
             let bgColorClass = 'bg-yellow-100', textColorClass = 'text-yellow-800', borderColorClass = 'border-yellow-500';
             if (statusAtual === 'Completa') { bgColorClass = 'bg-blue-100'; textColorClass = 'text-blue-800'; borderColorClass = 'border-blue-500'; }
             else if (statusAtual === 'Paga') { bgColorClass = 'bg-green-100'; textColorClass = 'text-green-800'; borderColorClass = 'border-green-500'; }
             else if (statusAtual === 'Falta') { bgColorClass = 'bg-red-100'; textColorClass = 'text-red-800'; borderColorClass = 'border-red-500'; }
+            
+            const firstName = lesson.studentName ? lesson.studentName.split(' ')[0] : 'Aluno';
+
             return (
               <div 
                 key={lesson.id} 
-                title={`${lesson.horario || '?'} - ${lesson.studentName} (${statusAtual}) - ${formatDuration(lesson.duracao)}`} 
-                className={`calendar-aula ${bgColorClass} ${textColorClass} ${borderColorClass}`}
+                title={`${lesson.time || '?'} - ${lesson.studentName} (${statusAtual}) - ${formatDuration(lesson.duration)}`} 
+                className={`calendar-aula ${bgColorClass} ${textColorClass} ${borderColorClass} cursor-pointer hover:opacity-80`}
+                onClick={(e) => { e.stopPropagation(); onLessonClick(lesson.studentId); }}
               >
-                {lesson.horario || '?'} {getInitials(lesson.studentName, 2)}
+                {lesson.time || '?'} {firstName}
               </div>
             );
           })}
@@ -176,12 +188,11 @@ function MonthView({ date, lessons, onDayClick, formatDuration, getInitials, for
   return (
     <div>
       <div className="grid grid-cols-7 gap-px">
-        {/* Cabeçalho dos dias da semana com texto em negrito */}
         {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => 
-            <div key={d} className="calendar-day-header font-semibold text-gray-700">{d}</div> // Adicionado font-semibold e text-gray-700
+            <div key={d} className="calendar-day-header font-bold text-gray-800 py-2">{d}</div>
         )}
       </div>
-      <div className="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-b-md overflow-hidden"> {/* Adicionado rounded-b-md e overflow-hidden */}
+      <div className="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-b-md overflow-hidden">
         {dayCells.map(cell => cell)}
       </div>
     </div>
@@ -189,7 +200,7 @@ function MonthView({ date, lessons, onDayClick, formatDuration, getInitials, for
 }
 
 // --- Componente de Visualização Semanal ---
-function WeekView({ date, lessons, formatDuration, formatCurrency, formatDateToInput, showToast, teacherId }) {
+function WeekView({ date, lessons, formatDuration, formatCurrency, formatDateToInput, showToast, teacherId, onLessonClick }) {
   const currentDayOfWeek = date.getDay();
   const startDate = new Date(date);
   startDate.setDate(date.getDate() - currentDayOfWeek);
@@ -199,25 +210,44 @@ function WeekView({ date, lessons, formatDuration, formatCurrency, formatDateToI
   const headerCells = [];
   const dayColumns = [];
 
+  const getStatusInfo = (status) => {
+    switch (status) {
+      case 'Completa': return { style: "bg-blue-100 text-blue-800 border-blue-500", icon: <CheckCircle className="h-3 w-3 mr-1" /> };
+      case 'Paga': return { style: "bg-green-100 text-green-800 border-green-500", icon: <DollarSign className="h-3 w-3 mr-1" /> };
+      case 'Falta': return { style: "bg-red-100 text-red-800 border-red-500", icon: <AlertCircle className="h-3 w-3 mr-1" /> };
+      default: return { style: "bg-yellow-100 text-yellow-800 border-yellow-500", icon: <Clock className="h-3 w-3 mr-1" /> };
+    }
+  };
+
   for (let i = 0; i < 7; i++) {
     const dayDate = new Date(startDate);
     dayDate.setDate(startDate.getDate() + i);
     const dateString = formatDateToInput(dayDate);
-    headerCells.push(<div key={`header-${i}`} className={`calendar-day-header font-semibold text-gray-700 ${dayDate.getTime() === today.getTime() ? 'bg-indigo-100 text-indigo-700' : ''}`}>{weekdaysShort[i]} {dayDate.getDate()}</div>); // Adicionado font-semibold e text-gray-700
-    const lessonsDoDia = lessons.filter(l => l.data === dateString).sort((a, b) => (a.horario || '').localeCompare(b.horario || ''));
+    headerCells.push(<div key={`header-${i}`} className={`calendar-day-header font-bold text-gray-800 py-2 ${dayDate.getTime() === today.getTime() ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-50'}`}>{weekdaysShort[i]} {dayDate.getDate()}</div>);
+    // --- CORREÇÃO AQUI: l.data para l.date ---
+    const lessonsDoDia = lessons.filter(l => l.date === dateString).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    // --- FIM DA CORREÇÃO ---
     dayColumns.push(
-      <div key={`col-${i}`} className={`day-column min-h-[150px] p-1.5 ${dayDate.getTime() === today.getTime() ? 'bg-indigo-50' : 'bg-white'}`}>
+      <div key={`col-${i}`} className={`day-column min-h-[180px] p-1.5 space-y-1.5 ${dayDate.getTime() === today.getTime() ? 'bg-indigo-50' : 'bg-white'}`}>
         {lessonsDoDia.map(lesson => {
           const statusAtual = lesson.status || 'Pendente';
-          let statusStyle = "bg-yellow-100 text-yellow-800 border-yellow-500";
-          if (statusAtual === 'Completa') statusStyle = "bg-blue-100 text-blue-800 border-blue-500";
-          else if (statusAtual === 'Paga') statusStyle = "bg-green-100 text-green-800 border-green-500";
-          else if (statusAtual === 'Falta') statusStyle = "bg-red-100 text-red-800 border-red-500";
+          const badgeInfo = getStatusInfo(statusAtual);
           return (
-            <div key={lesson.id} className={`p-1.5 text-[0.7rem] border-l-4 rounded-sm mb-1 ${statusStyle} shadow-sm`}>
-              <div className="font-semibold text-gray-800">{lesson.horario || '?'} <span className="font-normal text-gray-600">({formatDuration(lesson.duracao)})</span></div>
-              <div className="text-gray-700 truncate">{lesson.studentName}</div>
-              <div className="text-xs text-gray-600">{statusAtual} - {formatCurrency(lesson.valor)}</div>
+            <div 
+              key={lesson.id} 
+              className={`p-2 text-xs border-l-4 rounded-md shadow-sm cursor-pointer hover:shadow-md transition-shadow ${badgeInfo.style}`}
+              onClick={(e) => { e.stopPropagation(); onLessonClick(lesson.studentId); }}
+              title={`Aluno: ${lesson.studentName}\nStatus: ${statusAtual}\nValor: ${formatCurrency(lesson.value)}\nDuração: ${formatDuration(lesson.duration)}`}
+            >
+              <div className="font-semibold text-gray-800 flex items-center justify-between">
+                <span>{lesson.time || '?'}</span>
+                <span className="font-normal text-[0.65rem] text-gray-500">({formatDuration(lesson.duration)})</span>
+              </div>
+              <div className="text-gray-700 truncate mt-0.5">{lesson.studentName}</div>
+              <div className="text-[0.65rem] flex items-center mt-1">
+                {badgeInfo.icon}
+                <span>{statusAtual}</span>
+              </div>
             </div>
           );
         })}
@@ -227,7 +257,7 @@ function WeekView({ date, lessons, formatDuration, formatCurrency, formatDateToI
   return (
     <div>
       <div className="grid grid-cols-7 gap-px">{headerCells}</div>
-      <div className="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-b-md overflow-hidden"> {/* Adicionado rounded-b-md e overflow-hidden */}
+      <div className="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-b-md overflow-hidden">
         {dayColumns}
       </div>
     </div>
@@ -235,10 +265,10 @@ function WeekView({ date, lessons, formatDuration, formatCurrency, formatDateToI
 }
 
 // --- Componente de Visualização Diária ---
-function DayView({ date, lessons, formatDuration, formatCurrency, formatDateToInput, showToast, teacherId }) {
+function DayView({ date, lessons, formatDuration, formatCurrency, formatDateToInput, showToast, teacherId, onLessonClick }) {
   const handleUpdateStatus = async (studentId, lessonId, newStatus) => {
     try {
-      await updateAulaStatusInDb(teacherId, studentId, lessonId, newStatus);
+      await updateLessonStatusInDb(teacherId, studentId, lessonId, newStatus);
       if (showToast) showToast(`Aula marcada como ${newStatus.toLowerCase()}.`, 'success');
     } catch (error) {
       if (showToast) showToast(error.message || `Erro ao marcar status.`, 'error');
@@ -249,7 +279,7 @@ function DayView({ date, lessons, formatDuration, formatCurrency, formatDateToIn
   const handleDelete = async (studentId, lessonId) => {
     if (confirm('Deletar esta aula?')) {
       try {
-        await deleteAulaFromDb(teacherId, studentId, lessonId);
+        await deleteLessonFromDb(teacherId, studentId, lessonId);
         if (showToast) showToast('Aula deletada com sucesso.', 'success');
       } catch (error) {
         if (showToast) showToast(error.message || 'Erro ao deletar aula.', 'error');
@@ -259,7 +289,9 @@ function DayView({ date, lessons, formatDuration, formatCurrency, formatDateToIn
   };
 
   const dateString = formatDateToInput(date);
-  const lessonsDoDia = lessons.filter(l => l.data === dateString).sort((a, b) => (a.horario || '').localeCompare(b.horario || ''));
+  // --- CORREÇÃO AQUI: l.data para l.date ---
+  const lessonsDoDia = lessons.filter(l => l.date === dateString).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+  // --- FIM DA CORREÇÃO ---
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -285,22 +317,26 @@ function DayView({ date, lessons, formatDuration, formatCurrency, formatDateToIn
         const canMarkPending = statusAtual !== 'Pendente' && statusAtual !== 'Completa' && statusAtual !== 'Paga';
 
         return (
-          <div key={lesson.id} className="p-3 rounded-md bg-white border border-gray-200 shadow-sm flex flex-col sm:flex-row justify-between items-start gap-2 hover:shadow-md transition-shadow">
+          <div 
+            key={lesson.id} 
+            className="p-3 rounded-md bg-white border border-gray-200 shadow-sm flex flex-col sm:flex-row justify-between items-start gap-2 hover:shadow-md transition-shadow cursor-pointer"
+            onClick={(e) => { e.stopPropagation(); onLessonClick(lesson.studentId); }}
+          >
             <div className="flex-grow">
-              <div className="font-semibold text-gray-800">{lesson.horario || '?'} <span className="text-xs text-gray-600">({formatDuration(lesson.duracao)})</span></div>
+              <div className="font-semibold text-gray-800">{lesson.time || '?'} <span className="text-xs text-gray-600">({formatDuration(lesson.duration)})</span></div>
               <div className="text-sm text-gray-700">{lesson.studentName}</div>
-              <div className="text-xs text-gray-600">Valor: {formatCurrency(lesson.valor)}</div>
+              <div className="text-xs text-gray-600">Valor: {formatCurrency(lesson.value)}</div>
               <div className={`mt-2 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border-l-4 ${badge.style}`}>
                 {badge.icon}
                 {badge.text}
               </div>
             </div>
             <div className="aula-actions flex-shrink-0 flex flex-wrap gap-1.5 items-center self-start sm:self-center mt-2 sm:mt-0">
-              {canMarkComplete && <button onClick={() => handleUpdateStatus(lesson.studentId, lesson.id, 'Completa')} className="p-1.5 rounded-md hover:bg-blue-100 text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400" title="Marcar como Completa"><CheckCircle className="h-5 w-5" /></button>}
-              {canMarkPaid && <button onClick={() => handleUpdateStatus(lesson.studentId, lesson.id, 'Paga')} className="p-1.5 rounded-md hover:bg-green-100 text-green-600 focus:outline-none focus:ring-2 focus:ring-green-400" title="Marcar como Paga"><DollarSign className="h-5 w-5" /></button>}
-              {canMarkAbsent && <button onClick={() => handleUpdateStatus(lesson.studentId, lesson.id, 'Falta')} className="p-1.5 rounded-md hover:bg-red-100 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-400" title="Marcar como Falta"><AlertCircle className="h-5 w-5" /></button>}
-              {statusAtual !== 'Pendente' && canMarkPending && <button onClick={() => handleUpdateStatus(lesson.studentId, lesson.id, 'Pendente')} className="p-1.5 rounded-md hover:bg-yellow-100 text-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-400" title="Marcar como Pendente"><Clock className="h-5 w-5" /></button>}
-              <button onClick={() => handleDelete(lesson.studentId, lesson.id)} className="p-1.5 rounded-md hover:bg-gray-200 text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400" title="Deletar Aula"><Trash2 className="h-5 w-5" /></button>
+              {canMarkComplete && <button onClick={(e) => {e.stopPropagation(); handleUpdateStatus(lesson.studentId, lesson.id, 'Completa')}} className="p-1.5 rounded-md hover:bg-blue-100 text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400" title="Marcar como Completa"><CheckCircle className="h-5 w-5" /></button>}
+              {canMarkPaid && <button onClick={(e) => {e.stopPropagation(); handleUpdateStatus(lesson.studentId, lesson.id, 'Paga')}} className="p-1.5 rounded-md hover:bg-green-100 text-green-600 focus:outline-none focus:ring-2 focus:ring-green-400" title="Marcar como Paga"><DollarSign className="h-5 w-5" /></button>}
+              {canMarkAbsent && <button onClick={(e) => {e.stopPropagation(); handleUpdateStatus(lesson.studentId, lesson.id, 'Falta')}} className="p-1.5 rounded-md hover:bg-red-100 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-400" title="Marcar como Falta"><AlertCircle className="h-5 w-5" /></button>}
+              {statusAtual !== 'Pendente' && canMarkPending && <button onClick={(e) => {e.stopPropagation(); handleUpdateStatus(lesson.studentId, lesson.id, 'Pendente')}} className="p-1.5 rounded-md hover:bg-yellow-100 text-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-400" title="Marcar como Pendente"><Clock className="h-5 w-5" /></button>}
+              <button onClick={(e) => {e.stopPropagation(); handleDelete(lesson.studentId, lesson.id)}} className="p-1.5 rounded-md hover:bg-gray-200 text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400" title="Deletar Aula"><Trash2 className="h-5 w-5" /></button>
             </div>
           </div>
         );
