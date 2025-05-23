@@ -1,19 +1,20 @@
 'use client';
 
-import React, { useState, useEffect } from 'react'; // useEffect pode não ser mais necessário aqui
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { handleFirebaseLogin } from '../../utils/authService'; // Importa diretamente a função de login
+import { useAuth } from '../../context/AuthContext'; // Importa o hook useAuth
 import { LogIn, ArrowRight } from 'lucide-react';
 import Toast from '../../components/Toast';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { currentUser, isLoadingAuth } = useAuth(); // Usa o contexto
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const [toast, setToast] = useState({ message: '', type: '', isOpen: false });
 
   const showToast = (message, type = 'info', duration = 4000) => {
@@ -23,23 +24,35 @@ export default function LoginPage() {
   const closeToast = () => {
     setToast({ message: '', type: '', isOpen: false });
   };
-  
+
+  // Redireciona se o usuário já estiver logado e a verificação de auth tiver terminado
+  useEffect(() => {
+    if (!isLoadingAuth && currentUser) {
+      console.log("LoginPage: Usuário já logado, redirecionando para /home...");
+      router.replace('/home');
+    }
+  }, [isLoadingAuth, currentUser, router]);
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      // Chama diretamente a função de login do authService
-      const user = await handleFirebaseLogin(email, password);
+      const user = await handleFirebaseLogin(email, password); // Chama a função do authService
       console.log("Login bem-sucedido, usuário:", user);
       showToast('Login bem-sucedido! Redirecionando...', 'success');
-      // Após o login bem-sucedido, o onAuthStateChanged no RootLayout (se configurado)
-      // deve detectar a mudança e o RootLayout ou um componente de ordem superior
-      // deve lidar com o redirecionamento para /home.
-      // Por enquanto, podemos adicionar um redirecionamento direto aqui,
-      // mas o ideal é que o estado global de autenticação dispare isso.
+      // O onAuthStateChanged no AuthProvider (em layout.js) deve detectar a mudança
+      // e o useEffect acima (ou um na HomePage) deve tratar do redirecionamento.
+      // Adicionamos um timeout para o toast ser visível antes do redirecionamento pelo useEffect.
       setTimeout(() => {
-        router.replace('/home'); // Redireciona para a home após o login
-      }, 1500); // Pequeno delay para o toast ser visível
+        // O redirecionamento será feito pelo useEffect se currentUser for atualizado
+        // ou podemos forçar aqui se necessário após o tempo do toast.
+        // No entanto, é melhor deixar o useEffect lidar com isso baseado no estado de currentUser.
+        // Se o currentUser não atualizar rapidamente, pode ser necessário um router.replace('/home') aqui.
+        // Por agora, vamos confiar que o AuthProvider atualizará currentUser e o useEffect fará o resto.
+        if (!currentUser) { // Se por algum motivo o estado currentUser não atualizou a tempo
+            router.replace('/home');
+        }
+      }, 1500);
     } catch (err) {
       console.error("Erro no login (capturado em LoginPage):", err);
       showToast(err.message || 'Erro ao tentar fazer login.', 'error');
@@ -52,8 +65,14 @@ export default function LoginPage() {
     router.push('/register');
   };
 
-  // A lógica de "Verificando autenticação..." ou "Redirecionando..." foi removida
-  // pois esta página agora não tem conhecimento do estado global de autenticação.
+  // Mostra um loader enquanto o estado de autenticação está sendo verificado
+  if (isLoadingAuth) {
+    return <p className="flex justify-center items-center min-h-screen text-gray-700">Verificando autenticação...</p>;
+  }
+  // Se já estiver logado (após isLoadingAuth ser false), o useEffect acima deve redirecionar.
+  if (currentUser) {
+      return <p className="flex justify-center items-center min-h-screen text-gray-700">Redirecionando...</p>;
+  }
 
   return (
     <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100 px-4 sm:px-6 lg:px-8">

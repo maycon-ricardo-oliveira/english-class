@@ -1,20 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { registerTeacherInFirebase } from '../../utils/authService'; // Ajuste o caminho se necessário
+import { registerTeacherInFirebase } from '../../utils/authService'; // Continua usando esta função
+import { useAuth } from '../../context/AuthContext'; // Importa o hook useAuth
 import { UserPlus, ArrowRight } from 'lucide-react';
-import Toast from '../../components/Toast'; // Importa o componente Toast
+import Toast from '../../components/Toast';
 
 export default function RegisterPage() {
   const router = useRouter();
-  
+  const { currentUser, isLoadingAuth } = useAuth(); // Usa o contexto para verificar o usuário logado e o estado de carregamento
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const [toast, setToast] = useState({ message: '', type: '', isOpen: false });
 
   const showToast = (message, type = 'info', duration = 4000) => {
@@ -24,6 +25,14 @@ export default function RegisterPage() {
   const closeToast = () => {
     setToast({ message: '', type: '', isOpen: false });
   };
+
+  // Redireciona se o usuário já estiver logado e a verificação de auth tiver terminado
+  useEffect(() => {
+    if (!isLoadingAuth && currentUser) {
+      console.log("RegisterPage: Usuário já logado, redirecionando para /home...");
+      router.replace('/home');
+    }
+  }, [isLoadingAuth, currentUser, router]);
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -38,7 +47,7 @@ export default function RegisterPage() {
     try {
       console.log("RegisterPage: Tentando registar com:", name, email);
       await registerTeacherInFirebase(name, email, password);
-      showToast('Registo realizado com sucesso! Você será redirecionado para o login.', 'success');
+      showToast('Registo realizado com sucesso! Você será redirecionado para a página de login.', 'success');
       setTimeout(() => {
         router.push('/login'); 
       }, 2000);
@@ -46,12 +55,21 @@ export default function RegisterPage() {
       console.error("Erro no handleRegister (RegisterPage):", err);
       showToast(err.message || 'Ocorreu um erro ao tentar registar.', 'error');
       setIsSubmitting(false); // Garante que isSubmitting seja false em caso de erro
-    } 
-    // Removido o finally para que isSubmitting só seja false no erro ou após o redirect
+    }
+    // Não reseta isSubmitting aqui se o sucesso levar a um redirecionamento
   };
   
+  // Mostra um loader enquanto o estado de autenticação está sendo verificado
+  if (isLoadingAuth) {
+    return <p className="flex justify-center items-center min-h-screen text-gray-700">Verificando autenticação...</p>;
+  }
+  // Se já estiver logado (após isLoadingAuth ser false), o useEffect acima deve redirecionar.
+  // Este return é uma segurança adicional.
+  if (currentUser) {
+      return <p className="flex justify-center items-center min-h-screen text-gray-700">Redirecionando...</p>;
+  }
+
   return (
-    // Fundo cinza claro para toda a tela
     <div className="flex flex-col justify-center items-center min-h-screen bg-gray-100 px-4 sm:px-6 lg:px-8">
       {toast.isOpen && (
         <Toast
@@ -61,25 +79,24 @@ export default function RegisterPage() {
           duration={toast.duration}
         />
       )}
-
-      <div className="w-full max-w-md bg-white p-8 sm:p-10 rounded-xl shadow-lg"> {/* Card branco */}
+      <div className="w-full max-w-md bg-white p-8 sm:p-10 rounded-xl shadow-lg">
         <div className="text-center mb-8">
             <Link href="/" className="inline-block mb-6">
                 <span className="text-3xl font-bold text-indigo-600">ClassFlow</span>
             </Link>
-            <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900"> {/* Título mais escuro */}
+            <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900">
             Crie sua Conta de Professor
             </h2>
-            <p className="mt-2 text-sm text-gray-700"> {/* Texto de parágrafo mais escuro */}
+            <p className="mt-2 text-sm text-gray-700">
             Comece a organizar suas aulas e alunos hoje mesmo.
             </p>
         </div>
         
-        <form onSubmit={handleRegister} className="space-y-5"> {/* Espaçamento ligeiramente ajustado */}
+        <form onSubmit={handleRegister} className="space-y-5">
           <div>
             <label
               htmlFor="registerName"
-              className="block text-sm font-medium text-gray-800 mb-1" // Label mais escuro
+              className="block text-sm font-medium text-gray-800 mb-1"
             >
               Nome Completo
             </label>
@@ -91,14 +108,14 @@ export default function RegisterPage() {
               required
               disabled={isSubmitting}
               placeholder="Seu nome completo"
-              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-50" // Texto do input e placeholder ajustados
+              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-50"
             />
           </div>
 
           <div>
             <label
               htmlFor="registerEmail"
-              className="block text-sm font-medium text-gray-800 mb-1" // Label mais escuro
+              className="block text-sm font-medium text-gray-800 mb-1"
             >
               Email
             </label>
@@ -110,14 +127,14 @@ export default function RegisterPage() {
               required
               disabled={isSubmitting}
               placeholder="seu@email.com"
-              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-50" // Texto do input e placeholder ajustados
+              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-50"
             />
           </div>
 
           <div>
             <label
               htmlFor="registerPassword"
-              className="block text-sm font-medium text-gray-800 mb-1" // Label mais escuro
+              className="block text-sm font-medium text-gray-800 mb-1"
             >
               Senha
             </label>
@@ -129,7 +146,7 @@ export default function RegisterPage() {
               required
               disabled={isSubmitting}
               placeholder="Mínimo 6 caracteres"
-              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-50" // Texto do input e placeholder ajustados
+              className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 sm:text-sm p-3 text-gray-800 placeholder-gray-500 disabled:opacity-70 disabled:bg-gray-50"
             />
           </div>
 
@@ -150,7 +167,7 @@ export default function RegisterPage() {
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-700 mt-8"> {/* Texto do parágrafo mais escuro */}
+        <p className="text-center text-sm text-gray-700 mt-8">
           Já tem uma conta?{' '}
           <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-500 hover:underline">
             Faça Login <ArrowRight className="inline h-4 w-4"/>

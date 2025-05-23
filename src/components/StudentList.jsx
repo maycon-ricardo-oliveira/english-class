@@ -4,8 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { Users, Search, ArrowRight } from 'lucide-react'; // Ícones
 
 // O componente StudentList agora espera uma prop onOpenDetail
-export default function StudentList({ onOpenDetail }) {
-  const students = teacher?.students || [];
+export default function StudentList({ students, onOpenDetail }) {
 
   const [searchTerm, setSearchTerm] = useState('');
 
