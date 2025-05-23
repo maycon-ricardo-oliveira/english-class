@@ -27,7 +27,7 @@ export const addStudentToDb = async (teacherId, studentData) => {
   const studentWithId = { 
     ...studentData, 
     id: newStudentId,
-    aulas: {} 
+    lessons: {} 
   };
   
   const fullPathToNewStudent = `${studentNodePath}/${newStudentId}`;
@@ -73,19 +73,19 @@ export const deleteStudentFromDb = async (teacherId, studentId) => {
 export const addAulaToDb = async (teacherId, studentId, aulaData) => {
     if (!teacherId || !studentId) throw new Error("IDs do Professor e Aluno são necessários.");
 
-    const aulaNodePath = `teachersData/${teacherId}/students/${studentId}/aulas`;
+    const aulaNodePath = `teachersData/${teacherId}/students/${studentId}/lessons`;
     const newAulaRef = push(ref(database, aulaNodePath));
-    const newAulaId = newAulaRef.key;
+    const newLessonId = newAulaRef.key;
 
-    if (!newAulaId) throw new Error("Não foi possível gerar ID para a nova aula.");
+    if (!newLessonId) throw new Error("Não foi possível gerar ID para a nova aula.");
     
-    const newAula = { ...aulaData, id: newAulaId };
+    const newAula = { ...aulaData, id: newLessonId };
     try {
-        await set(ref(database, `${aulaNodePath}/${newAulaId}`), newAula);
-        console.log(`api.js: Aula ${newAulaId} adicionada para aluno ${studentId}`);
-        return newAulaId;
+        await set(ref(database, `${aulaNodePath}/${newLessonId}`), newAula);
+        console.log(`api.js: Aula ${newLessonId} adicionada para aluno ${studentId}`);
+        return newLessonId;
     } catch (error) {
-        console.error(`api.js: ERRO AO ADICIONAR AULA (${aulaNodePath}/${newAulaId}):`, error);
+        console.error(`api.js: ERRO AO ADICIONAR AULA (${aulaNodePath}/${newLessonId}):`, error);
         throw new Error(`Falha ao salvar aula: ${error.message || 'Erro desconhecido.'}`);
     }
 };
@@ -106,7 +106,7 @@ export const addAulasLoteToDb = async (teacherId, studentId, aulas) => {
     }
 
     const updates = {};
-    const aulasBasePath = `teachersData/${teacherId}/students/${studentId}/aulas`;
+    const aulasBasePath = `teachersData/${teacherId}/students/${studentId}/lessons`;
     aulas.forEach(aula => {
       const newAulaRef = push(ref(database, aulasBasePath));
       if (newAulaRef.key) {
@@ -131,18 +131,18 @@ export const addAulasLoteToDb = async (teacherId, studentId, aulas) => {
  * Deleta uma aula específica.
  * @param {string} teacherId - O ID do professor.
  * @param {string} studentId - O ID do aluno.
- * @param {string} aulaId - O ID da aula a ser deletada.
+ * @param {string} lessonId - O ID da aula a ser deletada.
  * @returns {Promise<void>}
  * @throws {Error} Se a remoção falhar.
  */
-export const deleteAulaFromDb = async (teacherId, studentId, aulaId) => {
-    if (!teacherId || !studentId || !aulaId) throw new Error("IDs do Professor, Aluno e Aula são necessários.");
-    console.log(`api.js: Deletando aula ${aulaId} do aluno ${studentId}`);
+export const deleteAulaFromDb = async (teacherId, studentId, lessonId) => {
+    if (!teacherId || !studentId || !lessonId) throw new Error("IDs do Professor, Aluno e Aula são necessários.");
+    console.log(`api.js: Deletando aula ${lessonId} do aluno ${studentId}`);
     try {
-        await remove(ref(database, `teachersData/${teacherId}/students/${studentId}/aulas/${aulaId}`));
-        console.log(`api.js: Aula ${aulaId} deletada.`);
+        await remove(ref(database, `teachersData/${teacherId}/students/${studentId}/lessons/${lessonId}`));
+        console.log(`api.js: Aula ${lessonId} deletada.`);
     } catch (error) {
-        console.error(`api.js: ERRO AO DELETAR AULA ${aulaId}:`, error);
+        console.error(`api.js: ERRO AO DELETAR AULA ${lessonId}:`, error);
         throw new Error(`Falha ao deletar aula: ${error.message || 'Erro desconhecido.'}`);
     }
 };
@@ -151,20 +151,20 @@ export const deleteAulaFromDb = async (teacherId, studentId, aulaId) => {
  * Atualiza o status de uma aula específica.
  * @param {string} teacherId - O ID do professor.
  * @param {string} studentId - O ID do aluno.
- * @param {string} aulaId - O ID da aula.
+ * @param {string} lessonId - O ID da aula.
  * @param {string} newStatus - O novo status da aula.
  * @returns {Promise<void>}
  * @throws {Error} Se a atualização falhar ou as regras de status forem violadas.
  */
-export const updateAulaStatusInDb = async (teacherId, studentId, aulaId, newStatus) => {
-    if (!teacherId || !studentId || !aulaId || !newStatus) {
+export const updateAulaStatusInDb = async (teacherId, studentId, lessonId, newStatus) => {
+    if (!teacherId || !studentId || !lessonId || !newStatus) {
         throw new Error("IDs do Professor, Aluno, Aula e novo Status são necessários.");
     }
     
-    const aulaPath = `teachersData/${teacherId}/students/${studentId}/aulas/${aulaId}`;
+    const aulaPath = `teachersData/${teacherId}/students/${studentId}/lessons/${lessonId}`;
     const aulaRefPath = ref(database, aulaPath);
     
-    console.log(`api.js: Atualizando status da aula ${aulaId} para ${newStatus}`);
+    console.log(`api.js: Atualizando status da aula ${lessonId} para ${newStatus}`);
     try {
         const aulaSnapshot = await getFirebaseData(aulaRefPath); // Usa getFirebaseData importado
         if (!(aulaSnapshot && typeof aulaSnapshot.exists === 'function' && aulaSnapshot.exists())) { 
@@ -181,9 +181,9 @@ export const updateAulaStatusInDb = async (teacherId, studentId, aulaId, newStat
         }
 
         await update(aulaRefPath, { status: newStatus });
-        console.log(`api.js: Status da aula ${aulaId} atualizado para ${newStatus}.`);
+        console.log(`api.js: Status da aula ${lessonId} atualizado para ${newStatus}.`);
     } catch (error) {
-        console.error(`api.js: ERRO AO ATUALIZAR STATUS DA AULA ${aulaId}:`, error);
+        console.error(`api.js: ERRO AO ATUALIZAR STATUS DA AULA ${lessonId}:`, error);
         if (error.message.includes("Aulas Completas ou Pagas") || error.message.includes("Aulas marcadas como Falta")) {
             throw error;
         }

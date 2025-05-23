@@ -144,7 +144,7 @@ export default function HomePage() {
       {toast.isOpen && (<Toast message={toast.message} type={toast.type} onClose={closeToast} duration={toast.duration} />)}
       
       {/* Dashboard precisará usar useAuth() internamente se precisar de teacherData */}
-      {/* <Dashboard /> */}
+      <Dashboard />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8 mb-8">
         <button onClick={handleOpenAddStudentModal} type="button" className="w-full inline-flex items-center justify-center px-6 py-3 border border-transparent shadow-sm text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
@@ -156,7 +156,7 @@ export default function HomePage() {
       </div>
 
       {/* CalendarSection precisará usar useAuth() internamente se precisar de teacherData */}
-      {/* <CalendarSection showToast={showToast} /> */}
+      <CalendarSection showToast={showToast} />
       
       {isStudentDetailModalOpen && selectedStudentId && (<StudentDetailModal isOpen={isStudentDetailModalOpen} onClose={handleCloseStudentDetail} studentId={selectedStudentId} onOpenAddAula={handleOpenAddAula} onOpenAddAulaLote={handleOpenAddAulaLote} showToast={showToast} />)}
       {isAddAulaModalOpen && studentForAulaModal && (<AddAulaModal isOpen={isAddAulaModalOpen} onClose={handleCloseAddAula} studentId={studentForAulaModal} showToast={showToast} />)}

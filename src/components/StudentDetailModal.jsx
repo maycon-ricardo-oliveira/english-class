@@ -1,20 +1,25 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react'; // Adicionado useRef
 import { useAuth } from '../context/AuthContext';
 import { 
     deleteAulaFromDb, 
     deleteStudentFromDb, 
     updateAulaStatusInDb 
-} from '../utils/api'; // Funções da API para interagir com o DB
+} from '../utils/api';
 import { formatCurrency, formatDate, formatDuration } from '../utils/formatters';
-import { X, CalendarPlus, CalendarCheck, Trash2, CheckCircle, DollarSign, AlertCircle, Clock } from 'lucide-react';
+import { X, CalendarPlus, CalendarCheck, Trash2, CheckCircle, DollarSign, AlertCircle, Clock, Filter, ChevronDown } from 'lucide-react'; // Adicionado ChevronDown
+
+const ALL_POSSIBLE_STATUSES = ['Pendente', 'Completa', 'Paga', 'Falta'];
 
 export default function StudentDetailModal({ isOpen, onClose, studentId, onOpenAddAula, onOpenAddAulaLote, showToast }) {
   const { currentUser, teacherData } = useAuth();
 
   const [student, setStudent] = useState(null);
-  const [aulaFilter, setAulaFilter] = useState('currentMonth');
+  const [aulaPeriodFilter, setAulaPeriodFilter] = useState('currentMonth');
+  const [selectedStatuses, setSelectedStatuses] = useState([...ALL_POSSIBLE_STATUSES]);
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false); // Estado para o dropdown de status
+  const statusDropdownRef = useRef(null); // Ref para o dropdown
 
   useEffect(() => {
     if (isOpen && studentId && teacherData && teacherData.students) {
@@ -22,38 +27,71 @@ export default function StudentDetailModal({ isOpen, onClose, studentId, onOpenA
       setStudent(foundStudent || null);
       if (!foundStudent) {
         console.warn("StudentDetailModal: Aluno com ID", studentId, "não encontrado nos dados do professor.");
-        // onClose(); // Opcional: fechar se o aluno não for encontrado
       }
+      setAulaPeriodFilter('currentMonth'); 
+      setSelectedStatuses([...ALL_POSSIBLE_STATUSES]); 
+      setIsStatusDropdownOpen(false); // Fecha o dropdown ao abrir/mudar aluno
     } else if (!isOpen) {
       setStudent(null); 
-      setAulaFilter('currentMonth'); // Reseta o filtro ao fechar
     }
-  }, [isOpen, studentId, teacherData]); // Adicionado onClose à lista de dependências se ele puder mudar
+  }, [isOpen, studentId, teacherData]);
+
+  // Fecha o dropdown de status se clicar fora dele
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target)) {
+        setIsStatusDropdownOpen(false);
+      }
+    }
+    if (isStatusDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isStatusDropdownOpen]);
+
+
+  const handleStatusFilterChange = (statusToToggle) => {
+    setSelectedStatuses(prevStatuses =>
+      prevStatuses.includes(statusToToggle)
+        ? prevStatuses.filter(s => s !== statusToToggle)
+        : [...prevStatuses, statusToToggle]
+    );
+  };
 
   const filteredAndSortedAulas = useMemo(() => {
-    if (!student || !Array.isArray(student.aulas)) return [];
-    let aulasFiltradas = [];
-    if (aulaFilter === 'currentMonth') {
+    if (!student || !Array.isArray(student.lessons)) return [];
+    
+    let aulasFiltradasPorPeriodo = [];
+    if (aulaPeriodFilter === 'currentMonth') {
       const hoje = new Date();
       const mesAtual = hoje.getMonth();
       const anoAtual = hoje.getFullYear();
-      aulasFiltradas = student.aulas.filter(aula => {
+      aulasFiltradasPorPeriodo = student.lessons.filter(lesson => {
         try {
-          const dataAula = new Date(aula.data + 'T00:00:00');
-          return dataAula.getMonth() === mesAtual && dataAula.getFullYear() === anoAtual;
+          const dataLesson = new Date(lesson.data + 'T00:00:00');
+          return dataLesson.getMonth() === mesAtual && dataLesson.getFullYear() === anoAtual;
         } catch (e) { return false; }
       });
-    } else {
-      aulasFiltradas = [...student.aulas];
+    } else { 
+      aulasFiltradasPorPeriodo = [...student.lessons];
     }
-    return aulasFiltradas.sort((a, b) => {
+
+    const aulasFiltradasPorStatus = aulasFiltradasPorPeriodo.filter(lesson =>
+      selectedStatuses.includes(lesson.status || 'Pendente')
+    );
+
+    return aulasFiltradasPorStatus.sort((a, b) => {
       try {
         const dateA = new Date(`${a.data}T${a.horario || '00:00'}:00`);
         const dateB = new Date(`${b.data}T${b.horario || '00:00'}:00`);
-        return dateB - dateA;
+        return dateB - dateA; 
       } catch (e) { return 0; }
     });
-  }, [student, aulaFilter]);
+  }, [student, aulaPeriodFilter, selectedStatuses]);
 
   const handleDeleteStudent = async () => {
     if (!currentUser || !student) {
@@ -104,120 +142,128 @@ export default function StudentDetailModal({ isOpen, onClose, studentId, onOpenA
     return null; 
   }
 
-  const getStatusBadge = (status) => {
+  const getStatusInfo = (status) => {
     switch (status) {
-      case 'Completa': return { style: "bg-blue-100 text-blue-800 border-blue-500", icon: <CheckCircle className="h-3.5 w-3.5 mr-1.5" />, text: "Completa" };
-      case 'Paga': return { style: "bg-green-100 text-green-800 border-green-500", icon: <DollarSign className="h-3.5 w-3.5 mr-1.5" />, text: "Paga" };
-      case 'Falta': return { style: "bg-red-100 text-red-800 border-red-500", icon: <AlertCircle className="h-3.5 w-3.5 mr-1.5" />, text: "Falta" };
-      default: return { style: "bg-yellow-100 text-yellow-800 border-yellow-500", icon: <Clock className="h-3.5 w-3.5 mr-1.5" />, text: "Pendente" };
+      case 'Completa': return { style: "bg-blue-100 text-blue-800 border-blue-500 ring-blue-500", icon: <CheckCircle className="h-3.5 w-3.5 mr-1.5" />, text: "Completa" };
+      case 'Paga': return { style: "bg-green-100 text-green-800 border-green-500 ring-green-500", icon: <DollarSign className="h-3.5 w-3.5 mr-1.5" />, text: "Paga" };
+      case 'Falta': return { style: "bg-red-100 text-red-800 border-red-500 ring-red-500", icon: <AlertCircle className="h-3.5 w-3.5 mr-1.5" />, text: "Falta" };
+      default: return { style: "bg-yellow-100 text-yellow-800 border-yellow-500 ring-yellow-500", icon: <Clock className="h-3.5 w-3.5 mr-1.5" />, text: "Pendente" };
     }
   };
+  
+  const selectedStatusesText = selectedStatuses.length === ALL_POSSIBLE_STATUSES.length 
+    ? "Todos Status" 
+    : selectedStatuses.length === 0 
+    ? "Nenhum Status" 
+    : `${selectedStatuses.length} Status Selecionado(s)`;
 
   return (
-    // --- INVÓLUCRO DO MODAL COM BACKDROP ---
     <div className="fixed inset-0 bg-gray-300/45 backdrop-blur-sm overflow-y-auto h-full w-full z-[60] flex items-center justify-center p-4">
-      <div className="relative mx-auto border border-gray-200 w-full max-w-3xl shadow-xl rounded-lg bg-white">
-        <div className="p-6 max-h-[85vh] overflow-y-auto"> {/* Conteúdo rolável */}
+      <div className="relative mx-auto border border-gray-200 w-full max-w-4xl shadow-xl rounded-lg bg-white">
+        <div className="p-6 max-h-[90vh] overflow-y-auto">
           <div className="flex justify-between items-center border-b border-gray-200 pb-3 mb-6">
             <h3 className="text-2xl leading-6 font-semibold text-gray-900">
               {student.nome}
             </h3>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1 rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
+            <button type="button" onClick={onClose} className="p-1 rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
               <X className="h-6 w-6" />
             </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 mb-6">
-            <div>
-              <span className="font-medium text-sm text-gray-600 block">Valor por Aula:</span>
-              <span className="text-gray-800 text-lg">{formatCurrency(student.valorAula)}</span>
-            </div>
-            <div>
-              <span className="font-medium text-sm text-gray-600 block">Dia de Pagamento:</span>
-              <span className="text-gray-800 text-lg">{student.diaPagamento || 'N/D'}</span>
-            </div>
+            <div><span className="font-medium text-sm text-gray-600 block">Valor por Aula:</span><span className="text-gray-800 text-lg">{formatCurrency(student.valorAula)}</span></div>
+            <div><span className="font-medium text-sm text-gray-600 block">Dia de Pagamento:</span><span className="text-gray-800 text-lg">{student.diaPagamento || 'N/D'}</span></div>
           </div>
 
           <div className="flex items-center space-x-2 flex-wrap gap-2 mb-6 border-b border-gray-200 pb-6">
-            <button
-              onClick={() => onOpenAddAula(student.id)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              title="Adicionar Aula Única"
-            >
-              <CalendarPlus className="h-5 w-5 mr-2" /> Add Aula
-            </button>
-            <button
-              onClick={() => onOpenAddAulaLote(student.id)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              title="Cadastrar Aulas em Lote"
-            >
-              <CalendarCheck className="h-5 w-5 mr-2" /> Em Lote
-            </button>
-            <button
-              onClick={handleDeleteStudent}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-              title="Deletar Aluno"
-            >
-              <Trash2 className="h-5 w-5 mr-2 text-red-500" /> Deletar Aluno
-            </button>
+            <button onClick={() => onOpenAddAula(student.id)} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" title="Adicionar Aula Única"><CalendarPlus className="h-5 w-5 mr-2" /> Add Aula</button>
+            <button onClick={() => onOpenAddAulaLote(student.id)} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500" title="Cadastrar Aulas em Lote"><CalendarCheck className="h-5 w-5 mr-2" /> Em Lote</button>
+            <button onClick={handleDeleteStudent} className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500" title="Deletar Aluno"><Trash2 className="h-5 w-5 mr-2 text-red-500" /> Deletar Aluno</button>
           </div>
 
-          <div className="flex justify-between items-center mb-4">
-            <h4 className="text-xl font-medium text-gray-800">Histórico de Aulas</h4>
-            <div className="flex space-x-1 border border-gray-300 rounded-md p-0.5">
-              <button
-                type="button"
-                onClick={() => setAulaFilter('currentMonth')}
-                className={`filter-button ${aulaFilter === 'currentMonth' ? 'active' : ''}`}
-              >
-                Mês Atual
-              </button>
-              <button
-                type="button"
-                onClick={() => setAulaFilter('all')}
-                className={`filter-button ${aulaFilter === 'all' ? 'active' : ''}`}
-              >
-                Todas
-              </button>
+          {/* Seção de Filtros Atualizada */}
+          <div className="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50 space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                <h4 className="text-lg font-medium text-gray-800 flex items-center mb-2 sm:mb-0">
+                    <Filter size={18} className="mr-2 text-gray-500"/>Filtros do Histórico
+                </h4>
+                <div className="flex space-x-2"> {/* Aumentado space-x para separar os botões */}
+                      <div className="relative" ref={statusDropdownRef}>
+                        <button
+                            type="button"
+                            onClick={() => setIsStatusDropdownOpen(prev => !prev)}
+                            className="inline-flex items-center justify-between w-full sm:w-auto px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                            {selectedStatusesText}
+                            <ChevronDown className={`ml-2 h-4 w-4 transform transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                        {isStatusDropdownOpen && (
+                            <div className="absolute z-10 mt-1 w-full sm:w-auto min-w-[200px] bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                {ALL_POSSIBLE_STATUSES.map(status => {
+                                    const statusInfo = getStatusInfo(status);
+                                    return (
+                                        <label key={status} className={`flex items-center px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer ${selectedStatuses.includes(status) ? statusInfo.style.split(' ')[0] + ' ' + statusInfo.style.split(' ')[1] : 'text-gray-800'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedStatuses.includes(status)}
+                                                onChange={() => handleStatusFilterChange(status)}
+                                                className={`form-checkbox h-4 w-4 rounded mr-2 ${statusInfo.style.split(' ')[2].replace('border-','ring-').replace('-500','')} focus:ring-indigo-500`}
+                                            />
+                                            {statusInfo.icon}
+                                            {statusInfo.text}
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    <button 
+                        type="button" 
+                        onClick={() => setAulaPeriodFilter('currentMonth')} 
+                        className={`inline-flex items-center px-4 py-2 border text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors ${aulaPeriodFilter === 'currentMonth' ? 'bg-indigo-600 text-white border-transparent' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                    >
+                        Mês Atual
+                    </button>
+                    <button 
+                        type="button" 
+                        onClick={() => setAulaPeriodFilter('all')} 
+                        className={`inline-flex items-center px-4 py-2 border text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors ${aulaPeriodFilter === 'all' ? 'bg-indigo-600 text-white border-transparent' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                    >
+                        Todas
+                    </button>
+                </div>
             </div>
+            
+            
           </div>
-          <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
+
+          <h4 className="text-xl font-medium text-gray-800 mb-3">Histórico de Aulas (Lessons)</h4>
+          <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
             {filteredAndSortedAulas.length === 0 ? (
-              <p className="text-gray-500 text-sm italic py-4 text-center">
-                {aulaFilter === 'currentMonth' ? 'Nenhuma aula registrada para este mês.' : 'Nenhuma aula registrada.'}
-              </p>
+              <p className="text-gray-500 text-sm italic py-4 text-center">Nenhuma aula encontrada com os filtros selecionados.</p>
             ) : (
-              filteredAndSortedAulas.map((aula) => {
-                const statusAtual = aula.status || 'Pendente';
-                const badge = getStatusBadge(statusAtual);
+              filteredAndSortedAulas.map((lesson) => {
+                const statusAtual = lesson.status || 'Pendente';
+                const badgeInfo = getStatusInfo(statusAtual);
                 const canMarkComplete = statusAtual !== 'Completa' && statusAtual !== 'Paga' && statusAtual !== 'Falta';
                 const canMarkPaid = statusAtual !== 'Paga' && statusAtual !== 'Falta';
                 const canMarkAbsent = statusAtual !== 'Falta' && statusAtual !== 'Completa' && statusAtual !== 'Paga';
                 const canMarkPending = statusAtual !== 'Pendente' && statusAtual !== 'Completa' && statusAtual !== 'Paga';
 
                 return (
-                  <div key={aula.id} className="p-3 rounded-md bg-gray-50 border border-gray-200 shadow-sm flex flex-col sm:flex-row justify-between items-start gap-2">
+                  <div key={lesson.id} className="p-3 rounded-md bg-white border border-gray-200 shadow-sm flex flex-col sm:flex-row justify-between items-start gap-2 hover:shadow-md transition-shadow">
                     <div className="flex-grow">
-                      <div className="font-medium text-gray-800">
-                        {formatDate(aula.data)} {aula.horario ? `às ${aula.horario}` : ''}
-                        <span className="text-xs text-gray-500 ml-1">({formatDuration(aula.duracao)})</span>
-                      </div>
-                      <div className="text-sm text-gray-600">Valor: {formatCurrency(aula.valor)}</div>
-                      <div className={`mt-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border-l-4 ${badge.style}`}>
-                        {badge.icon}
-                        {badge.text}
-                      </div>
+                      <div className="font-medium text-gray-800">{formatDate(lesson.data)} {lesson.horario ? `às ${lesson.horario}` : ''}<span className="text-xs text-gray-500 ml-1">({formatDuration(lesson.duracao)})</span></div>
+                      <div className="text-sm text-gray-600">Valor: {formatCurrency(lesson.valor)}</div>
+                      <div className={`mt-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border-l-4 ${badgeInfo.style}`}>{badgeInfo.icon}{badgeInfo.text}</div>
                     </div>
                     <div className="aula-actions flex-shrink-0 flex flex-wrap gap-1 items-center self-start sm:self-center mt-2 sm:mt-0">
-                      {canMarkComplete && <button onClick={() => handleMarcarStatusAula(aula.id, 'Completa')} className="p-1.5 rounded-md hover:bg-blue-100 text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400" title="Marcar como Completa"><CheckCircle className="h-5 w-5" /></button>}
-                      {canMarkPaid && <button onClick={() => handleMarcarStatusAula(aula.id, 'Paga')} className="p-1.5 rounded-md hover:bg-green-100 text-green-600 focus:outline-none focus:ring-2 focus:ring-green-400" title="Marcar como Paga"><DollarSign className="h-5 w-5" /></button>}
-                      {canMarkAbsent && <button onClick={() => handleMarcarStatusAula(aula.id, 'Falta')} className="p-1.5 rounded-md hover:bg-red-100 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-400" title="Marcar como Falta"><AlertCircle className="h-5 w-5" /></button>}
-                      {statusAtual !== 'Pendente' && canMarkPending && <button onClick={() => handleMarcarStatusAula(aula.id, 'Pendente')} className="p-1.5 rounded-md hover:bg-yellow-100 text-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-400" title="Marcar como Pendente"><Clock className="h-5 w-5" /></button>}
-                      <button onClick={() => handleDeleteAula(aula.id)} className="p-1.5 rounded-md hover:bg-gray-200 text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400" title="Deletar Aula"><Trash2 className="h-5 w-5" /></button>
+                      {canMarkComplete && <button onClick={() => handleMarcarStatusAula(lesson.id, 'Completa')} className="p-1.5 rounded-md hover:bg-blue-100 text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400" title="Marcar como Completa"><CheckCircle className="h-5 w-5" /></button>}
+                      {canMarkPaid && <button onClick={() => handleMarcarStatusAula(lesson.id, 'Paga')} className="p-1.5 rounded-md hover:bg-green-100 text-green-600 focus:outline-none focus:ring-2 focus:ring-green-400" title="Marcar como Paga"><DollarSign className="h-5 w-5" /></button>}
+                      {canMarkAbsent && <button onClick={() => handleMarcarStatusAula(lesson.id, 'Falta')} className="p-1.5 rounded-md hover:bg-red-100 text-red-600 focus:outline-none focus:ring-2 focus:ring-red-400" title="Marcar como Falta"><AlertCircle className="h-5 w-5" /></button>}
+                      {statusAtual !== 'Pendente' && canMarkPending && <button onClick={() => handleMarcarStatusAula(lesson.id, 'Pendente')} className="p-1.5 rounded-md hover:bg-yellow-100 text-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-400" title="Marcar como Pendente"><Clock className="h-5 w-5" /></button>}
+                      <button onClick={() => handleDeleteAula(lesson.id)} className="p-1.5 rounded-md hover:bg-gray-200 text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-400" title="Deletar Aula"><Trash2 className="h-5 w-5" /></button>
                     </div>
                   </div>
                 );

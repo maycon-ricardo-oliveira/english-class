@@ -44,7 +44,7 @@ export function AuthProvider({ children }) {
               name: data.name || user.displayName || user.email.split('@')[0],
               students: data.students ? Object.values(data.students).map(s => ({
                 ...s,
-                aulas: s.aulas ? Object.values(s.aulas) : []
+                lessons: s.lessons ? Object.values(s.lessons) : []
               })) : []
             });
           } else {
