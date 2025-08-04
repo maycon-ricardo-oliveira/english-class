@@ -115,8 +115,9 @@ input[type="email"],
 input[type="password"],
 input[type="number"],
 input[type="date"],
+input[type="url"],
 input[type="time"] { /* Adicione outros types se necessário */
-  @apply p-2 text-gray-600 border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm;
+  @apply p-2 text-gray-600 border-gray-300 rounded-md focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm;
   /* Você pode adicionar outras classes base do Tailwind aqui */
 }
 

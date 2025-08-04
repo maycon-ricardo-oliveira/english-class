@@ -75,6 +75,44 @@ export const addStudentToDb = async (teacherId, studentPayload) => {
 };
 
 /**
+ * Atualiza os dados de um aluno existente no Firebase Realtime Database.
+ * @param {string} teacherId - O ID do professor.
+ * @param {string} studentId - O ID do aluno a ser atualizado.
+ * @param {object} studentPayload - Os dados do aluno a serem atualizados.
+ * @returns {Promise<void>}
+ * @throws {Error} Se a atualização falhar.
+ */
+export const updateStudentInDb = async (teacherId, studentId, studentPayload) => {
+  if (!teacherId || !studentId) {
+    throw new Error("IDs do Professor e do Aluno são necessários para atualizar.");
+  }
+  if (!studentPayload) {
+    throw new Error("Dados para atualização do aluno são necessários.");
+  }
+  console.log(`api.js: Atualizando aluno ${studentId} para o professor ${teacherId}`);
+
+  const studentNodePath = `teachersData/${teacherId}/students/${studentId}`;
+  const studentRef = ref(database, studentNodePath);
+
+  // Prepara os dados para atualização. O método 'update' só modifica os campos fornecidos.
+  const dataToUpdate = {
+    name: studentPayload.name.trim(),
+    studentEmail: studentPayload.studentEmail || null,
+    lessonLink: studentPayload.lessonLink || null,
+    lessonValue: studentPayload.lessonValue || 0,
+    paymentDay: studentPayload.paymentDay || null,
+  };
+
+  try {
+    await update(studentRef, dataToUpdate);
+    console.log(`api.js: Aluno ${studentId} atualizado com sucesso.`);
+  } catch (error) {
+    console.error(`api.js: ERRO AO ATUALIZAR ALUNO NO FIREBASE (${studentNodePath}):`, error);
+    throw new Error(`Falha ao atualizar aluno: ${error.message || 'Erro desconhecido.'}`);
+  }
+};
+
+/**
  * Deleta um aluno.
  * @param {string} teacherId
  * @param {string} studentId
